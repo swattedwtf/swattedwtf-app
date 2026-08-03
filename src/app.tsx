@@ -11,6 +11,8 @@ import { RegisterScreen } from "./auth/RegisterScreen"
 import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
 import { Settings } from "./settings/Settings"
+import { Walkthrough } from "./onboarding/Walkthrough"
+import { hasSeenWalkthrough } from "./lib/onboarding"
 import { Shell } from "./shell/Shell"
 import { WindowControls } from "./shell/WindowControls"
 import { resizeTo, watchMaximized } from "./shell/window"
@@ -29,6 +31,9 @@ type AuthView = { view: "login" } | { view: "twofa"; code: string } | { view: "r
 export default function App() {
   const [state, dispatch] = useReducer(bootReducer, initialBootState)
   const [maximized, setMaximized] = useState(false)
+  // Read once, at mount. Reading it per render would re-show the walkthrough
+  // for a frame after it marks itself seen.
+  const [showWalkthrough, setShowWalkthrough] = useState(() => !hasSeenWalkthrough())
   const [overview, setOverview] = useState<Overview | null>(null)
   const [auth, setAuth] = useState<AuthView>({ view: "login" })
   const [route, setRoute] = useState("/dashboard")
@@ -206,14 +211,20 @@ export default function App() {
         changed: state.changedFiles,
         manifest_version: "",
       }
+      // Sits over the shell rather than replacing it, so the app is already
+      // built and warm behind the walkthrough and dismissing it reveals a
+      // loaded dashboard rather than another loading state.
       return (
-        <Shell route={route} onNavigate={setRoute}>
-          {route === "/settings" ? (
-            <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
-          ) : (
-            <Home overview={overview} />
-          )}
-        </Shell>
+        <>
+          {showWalkthrough && <Walkthrough onDone={() => setShowWalkthrough(false)} />}
+          <Shell route={route} onNavigate={setRoute}>
+            {route === "/settings" ? (
+              <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
+            ) : (
+              <Home overview={overview} />
+            )}
+          </Shell>
+        </>
       )
     }
   }
