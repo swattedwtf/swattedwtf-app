@@ -13,6 +13,8 @@ import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
 import { Settings } from "./settings/Settings"
 import { Shell } from "./shell/Shell"
+import { WindowControls } from "./shell/WindowControls"
+import { isUnauthorized, messageOf } from "./lib/errors"
 import { ipc, type Overview } from "./lib/ipc"
 import "./theme.css"
 
@@ -20,9 +22,6 @@ import "./theme.css"
 const VERIFY_DWELL_MS = 900
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
-const messageOf = (err: unknown) =>
-  typeof err === "string" ? err : err instanceof Error ? err.message : String(err)
 
 /** Which auth screen is showing. Local to the auth phase, not the boot machine. */
 type AuthView = { view: "login" } | { view: "twofa"; code: string } | { view: "register" }
@@ -91,11 +90,14 @@ export default function App() {
         if (!cancelled) setOverview(data)
       } catch (err) {
         if (cancelled) return
-        const message = messageOf(err)
-        if (message.includes("401") || message.toLowerCase().includes("not authenticated")) {
-          dispatch({ type: "logged_out" })
+        if (isUnauthorized(err)) {
+          // The stored cookie is present but dead server-side. It must be
+          // cleared, or session_status keeps reporting "authenticated" from the
+          // local jar and every retry loops straight back to this same 401.
+          await ipc.logout().catch(() => {})
+          if (!cancelled) dispatch({ type: "logged_out" })
         } else {
-          dispatch({ type: "network_error", message })
+          dispatch({ type: "network_error", message: messageOf(err) })
         }
       }
     })()
@@ -119,6 +121,12 @@ export default function App() {
     dispatch({ type: "logged_out" })
   }, [])
 
+  // Rendered on every screen. The window is frameless, so without this there is
+  // no way to close or minimise the app during boot, login, or an error state,
+  // and the offline screen in particular would be a dead end.
+  const chrome = phase === "ready" ? null : <WindowControls />
+
+  const screen = (() => {
   switch (phase) {
     case "verifying":
       return <BootScreen label="Verifying" />
@@ -172,13 +180,14 @@ export default function App() {
       )
 
     case "reveal":
-      // Black while the payload lands. The previous screen is black too, so the
-      // gap reads as part of the reveal rather than as a pause.
-      if (!overview) return <div className="drag h-full bg-[#0b0b0b]" />
+      // The fetch is bounded by a 30s HTTP timeout, and a featureless black
+      // window for that long is indistinguishable from a hang, so keep the ring
+      // on screen rather than showing nothing.
+      if (!overview) return <BootScreen label="Loading your account" />
       return <RevealScreen overview={overview} onDone={() => dispatch({ type: "reveal_done" })} />
 
     case "ready": {
-      if (!overview) return <div className="drag h-full bg-[#0b0b0b]" />
+      if (!overview) return <BootScreen label="Loading your account" />
       const integrity: IntegrityReport = {
         ok: state.integrityOk,
         changed: state.changedFiles,
@@ -195,6 +204,14 @@ export default function App() {
       )
     }
   }
+  })()
+
+  return (
+    <>
+      {chrome}
+      {screen}
+    </>
+  )
 }
 
 // Re-exported so the one-time code reveal stays reachable from the auth flow

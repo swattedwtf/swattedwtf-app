@@ -83,7 +83,11 @@ body {
   .glass { background: oklch(0.09 0 0); }
 }
 
-/* Frameless drag regions. Interactive children must set -webkit-app-region: no-drag. */
+/* Frameless drag regions.
+   -webkit-app-region is an Electron feature and does NOTHING in Tauri, which
+   drags via the data-tauri-drag-region attribute instead (see DragRegion in
+   src/shell/drag.tsx). These classes remain only so the intent is greppable and
+   so `.no-drag` can opt a child out; the attribute is what actually drags. */
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 

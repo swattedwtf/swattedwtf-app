@@ -23,7 +23,7 @@ export function TamperedScreen({
   const rest = changedFiles.length - shown.length
 
   return (
-    <div className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
       <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[var(--color-warning)]/40 text-lg text-[var(--color-warning)]">
         !
       </div>
@@ -36,7 +36,7 @@ export function TamperedScreen({
         modified build, so treat it as a hint rather than a guarantee.
       </p>
 
-      <ul className="max-h-[140px] w-full max-w-[420px] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-3 font-mono text-[11px] text-[var(--color-warning)]">
+      <ul className="no-drag max-h-[140px] w-full max-w-[420px] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-3 font-mono text-[11px] text-[var(--color-warning)]">
         {shown.map((f) => (
           <li key={f} className="truncate">
             {f}

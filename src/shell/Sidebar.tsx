@@ -18,7 +18,7 @@ export function Sidebar({
 }) {
   return (
     <nav className="flex h-full w-[220px] shrink-0 flex-col overflow-y-auto border-r border-[var(--color-border)] bg-white/[0.018] px-2 pb-3">
-      <div className="drag px-2 pb-3 pt-4 text-[15px] font-semibold tracking-[-0.01em]">
+      <div data-tauri-drag-region className="drag px-2 pb-3 pt-4 text-[15px] font-semibold tracking-[-0.01em]">
         swatted<span className="text-[var(--mark-tld)]">.wtf</span>
       </div>
 

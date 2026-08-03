@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { messageOf } from "../lib/errors"
 import { ipc } from "../lib/ipc"
 
 /**
@@ -24,12 +25,12 @@ export function UpdateReadyScreen({
       // Does not return: the app relaunches.
     } catch (e) {
       setBusy(false)
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     }
   }
 
   return (
-    <div className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
       <p className="text-[26px] font-medium tracking-[-0.02em]">
         swatted<span className="text-[var(--mark-tld)]">.wtf</span>
       </p>

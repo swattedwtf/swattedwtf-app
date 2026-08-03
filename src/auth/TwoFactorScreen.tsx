@@ -1,6 +1,7 @@
 import { useState } from "react"
 
 import { ipc } from "../lib/ipc"
+import { messageOf } from "../lib/errors"
 
 /**
  * Second factor. Reached only when the server answered the login with
@@ -40,7 +41,7 @@ export function TwoFactorScreen({
   }
 
   return (
-    <div className="drag flex h-full flex-col items-center justify-center gap-8 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-8 bg-[#0b0b0b] px-10">
       <p className="text-[26px] font-medium tracking-[-0.02em] text-[var(--mark-fg)]">
         swatted<span className="text-[var(--mark-tld)]">.wtf</span>
       </p>
@@ -98,9 +99,3 @@ export function TwoFactorScreen({
   )
 }
 
-/** Rust errors arrive as strings; anything else is normalized for display. */
-function messageOf(err: unknown): string {
-  if (typeof err === "string") return err
-  if (err instanceof Error) return err.message
-  return String(err)
-}

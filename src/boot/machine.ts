@@ -120,7 +120,15 @@ export function bootReducer(state: BootState, event: BootEvent): BootState {
       return { ...state, phase: "ready" }
 
     case "logged_out":
-      return { ...initialBootState, phase: "auth", integrityOk: state.integrityOk }
+      // Integrity findings survive a logout: they describe the INSTALL, not the
+      // session. Dropping changedFiles here made Settings report "0 file(s)
+      // modified" on a tampered copy after signing out and back in.
+      return {
+        ...initialBootState,
+        phase: "auth",
+        integrityOk: state.integrityOk,
+        changedFiles: state.changedFiles,
+      }
 
     default:
       return state

@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import type { Overview } from "../lib/ipc"
 import { resolveWelcomeName, shouldPromptTelegram } from "../lib/welcome"
 
@@ -13,13 +13,20 @@ import { resolveWelcomeName, shouldPromptTelegram } from "../lib/welcome"
 const TOTAL_MS = 3000
 
 export function RevealScreen({ overview, onDone }: { overview: Overview; onDone: () => void }) {
+  // The callback is kept in a ref and the effect runs once. Keying the timer on
+  // `onDone` would restart the 3s countdown on every parent re-render, which
+  // would strand the user on the black wordmark screen indefinitely the moment
+  // anything else in App started re-rendering.
+  const done = useRef(onDone)
+  done.current = onDone
+
   useEffect(() => {
-    const t = setTimeout(onDone, TOTAL_MS)
+    const t = setTimeout(() => done.current(), TOTAL_MS)
     return () => clearTimeout(t)
-  }, [onDone])
+  }, [])
 
   return (
-    <div className="drag flex h-full flex-col items-center justify-center bg-[#0b0b0b]">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center bg-[#0b0b0b]">
       <p className="mark-in text-[34px] font-medium tracking-[-0.02em] text-[var(--mark-fg)]">
         swatted<span className="text-[var(--mark-tld)]">.wtf</span>
       </p>

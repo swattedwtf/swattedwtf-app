@@ -47,7 +47,7 @@ export function Shell({
     <div className="flex h-full bg-[#0b0b0b]">
       <Sidebar route={route} onNavigate={onNavigate} />
       <div className="relative flex-1 overflow-hidden">
-        <div className="drag absolute inset-x-0 top-0 h-10" />
+        <div data-tauri-drag-region className="drag absolute inset-x-0 top-0 h-10" />
         <WindowControls />
         <main className="h-full overflow-y-auto px-8 pb-10 pt-12">{children}</main>
       </div>

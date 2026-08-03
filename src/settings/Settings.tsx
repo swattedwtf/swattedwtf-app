@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { getVersion } from "@tauri-apps/api/app"
 import type { IntegrityReport } from "../boot/machine"
 import { ipc, type Overview } from "../lib/ipc"
+import { messageOf } from "../lib/errors"
 import { formatSince } from "../lib/format"
 
 const REPO_URL = "https://github.com/sujrb/swattedwtf-app"
@@ -169,9 +170,3 @@ export function Settings({
   )
 }
 
-/** Raw String(err) renders "Error: ..." at the user; this keeps just the text. */
-function messageOf(err: unknown): string {
-  if (err instanceof Error) return err.message
-  if (typeof err === "string") return err
-  return "Something went wrong."
-}

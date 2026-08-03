@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { ipc } from "../lib/ipc"
 import { formatLoginCode } from "./code"
+import { messageOf } from "../lib/errors"
 
 /** How long the "Copied" confirmation stays on the copy button. */
 const COPIED_MS = 1600
@@ -55,7 +56,7 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
   }
 
   return (
-    <div className="drag flex h-full flex-col items-center justify-center gap-6 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-6 bg-[#0b0b0b] px-10">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
         Your login code
       </p>
@@ -117,9 +118,3 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
   )
 }
 
-/** Plugin errors arrive as strings; anything else is normalized for display. */
-function messageOf(err: unknown): string {
-  if (typeof err === "string") return err
-  if (err instanceof Error) return err.message
-  return String(err)
-}
