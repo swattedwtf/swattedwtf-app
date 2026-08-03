@@ -109,6 +109,30 @@ impl ApiClient {
             .map_err(|e| AppError::Network(e.to_string()))?;
         Self::read(resp).await
     }
+
+    /// POST returning the raw status and body.
+    ///
+    /// Needed where the caller must read fields off a NON-2xx response. The
+    /// login route signals a second factor with `twofa_required: true` on a 401,
+    /// and that flag is the only reliable way to detect it: matching on the
+    /// human-readable error text would break the moment the copy is reworded.
+    pub async fn post_raw<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<(u16, String), AppError> {
+        let resp = self
+            .http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| AppError::Network(e.to_string()))?;
+
+        let status = resp.status().as_u16();
+        let text = resp.text().await.map_err(|e| AppError::Network(e.to_string()))?;
+        Ok((status, text))
+    }
 }
 
 #[cfg(test)]
