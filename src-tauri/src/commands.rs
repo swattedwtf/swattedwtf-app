@@ -90,10 +90,31 @@ pub async fn verify_integrity(app: AppHandle) -> crate::integrity::IntegrityRepo
         }
     };
 
-    let manifest = std::fs::read_to_string(resource_dir.join("integrity.json")).unwrap_or_default();
+    // Both paths come from bundle.resources in tauri.conf.json, which uses the
+    // MAP form precisely so these land where this code expects. With the list
+    // form Tauri preserves the source path, and the manifest ended up at
+    // resource_dir/resources/integrity.json while this read resource_dir/,
+    // which surfaced to users as "malformed manifest" on every launch.
+    let manifest_path = resource_dir.join("integrity.json");
+    let app_dir = resource_dir.join("app");
+
+    let manifest = match std::fs::read_to_string(&manifest_path) {
+        Ok(m) => m,
+        Err(e) => {
+            return crate::integrity::IntegrityReport {
+                ok: false,
+                changed: vec![format!("<manifest unreadable: {e}>")],
+                manifest_version: String::new(),
+            }
+        }
+    };
+
     let pubkey = hex::decode(INTEGRITY_PUBKEY_HEX).unwrap_or_default();
 
-    crate::integrity::verify_integrity(&resource_dir, &manifest, &pubkey)
+    // Hash the bundled copy of the frontend, not the resource root: Tauri
+    // embeds the served frontend inside the binary, so the files named in the
+    // manifest only exist on disk because bundle.resources ships dist/ to app/.
+    crate::integrity::verify_integrity(&app_dir, &manifest, &pubkey)
 }
 
 #[tauri::command]

@@ -43,9 +43,10 @@
     "publisher": "swatted.wtf",
     "shortDescription": "Open-source desktop client for swatted.wtf",
     "longDescription": "Open-source desktop client for the swatted.wtf OSINT platform.",
-    "resources": [
-      "resources/integrity.json"
-    ],
+    "resources": {
+      "resources/integrity.json": "integrity.json",
+      "../dist/": "app/"
+    },
     "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {

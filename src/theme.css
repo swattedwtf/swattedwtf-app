@@ -215,15 +215,46 @@ body {
   animation: screenIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Respect a stated preference for less motion: the boot reveal, the spinner
-   and these transitions all stop animating rather than being merely faster. */
+/* Respect a stated preference for less motion, without gutting the app.
+   The blanket "duration: 0.01ms on everything" this replaces was too broad:
+   Windows ships with "Animation effects" off for a lot of people, so the boot
+   reveal simply vanished for them and the app read as broken rather than as
+   calm. Entrances still play, just quickly, so content is never missing, while
+   the genuinely motion-heavy things (the infinite spinner, the blur-and-scale
+   reveal, parallax) stop. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .mark-in,
+  .welcome-in,
+  .hint-in,
+  .boot-mark,
+  .boot-label,
+  .screen-in,
+  .quick-root {
+    animation-duration: 0.12s !important;
+    animation-delay: 0s !important;
+  }
+
+  /* No blur-and-scale: that is the part that actually provokes discomfort. */
+  .mark-in {
+    filter: none !important;
+    transform: none !important;
+  }
+
+  /* Looping motion stops entirely. */
+  .ring-arc,
+  .ring-arc-slow,
+  .shimmer-label {
+    animation: none !important;
+  }
+
+  /* The ring still has to read as "working", so keep a non-moving cue. */
+  .shimmer-label {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .rule-in {
+    animation-duration: 0.12s !important;
+    animation-delay: 0s !important;
   }
 }
 
