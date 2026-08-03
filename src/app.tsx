@@ -14,7 +14,7 @@ import { Home } from "./dashboard/Home"
 import { Settings } from "./settings/Settings"
 import { Shell } from "./shell/Shell"
 import { WindowControls } from "./shell/WindowControls"
-import { resizeTo } from "./shell/window"
+import { resizeTo, watchMaximized } from "./shell/window"
 import { isUnauthorized, messageOf } from "./lib/errors"
 import { ipc, type Overview } from "./lib/ipc"
 import "./theme.css"
@@ -29,6 +29,7 @@ type AuthView = { view: "login" } | { view: "twofa"; code: string } | { view: "r
 
 export default function App() {
   const [state, dispatch] = useReducer(bootReducer, initialBootState)
+  const [maximized, setMaximized] = useState(false)
   const [overview, setOverview] = useState<Overview | null>(null)
   const [auth, setAuth] = useState<AuthView>({ view: "login" })
   const [route, setRoute] = useState("/dashboard")
@@ -106,6 +107,8 @@ export default function App() {
       cancelled = true
     }
   }, [phase, overview])
+
+  useEffect(() => watchMaximized(setMaximized), [])
 
   const handleAuthenticated = useCallback(() => {
     // Drop any stale payload so the reveal fetches for the account that just
@@ -211,10 +214,12 @@ export default function App() {
   })()
 
   return (
-    <>
+    // The window itself is transparent; this is the surface that has the
+    // rounded shape, so everything visible must live inside it.
+    <div className="app-root" data-maximized={maximized}>
       {chrome}
       {screen}
-    </>
+    </div>
   )
 }
 

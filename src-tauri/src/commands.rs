@@ -151,6 +151,16 @@ pub async fn save_recovery_file(app: AppHandle, code: String) -> Result<Option<S
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
+/// Dismisses the quick-lookup overlay.
+///
+/// The overlay hides itself rather than closing, so the next hotkey press is a
+/// show rather than a webview boot.
+#[tauri::command]
+pub async fn hide_quick(app: AppHandle) -> Result<(), AppError> {
+    crate::quick::hide(&app);
+    Ok(())
+}
+
 /// Opens a URL in the user's browser.
 ///
 /// Allowlisted by ORIGIN, not by prefix: a bare `starts_with("https://github.com")`

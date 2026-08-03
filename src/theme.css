@@ -58,8 +58,12 @@
 
 html, body, #root { height: 100%; }
 
+/* The window is transparent so the rounded corners of .app-root show through
+   as actual holes rather than dark squares. Nothing above .app-root may paint
+   a background, or the corners go solid again. */
+html, body, #root { background: transparent; }
+
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "cv11";
@@ -221,4 +225,83 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---- Window shape -------------------------------------------------------
+   A borderless window cannot be rounded by DWM (there is no frame to round),
+   so the rounding is done here and the native window is transparent behind it.
+
+   `overflow: hidden` is what actually clips child content to the curve: without
+   it the sidebar's own background paints square right into the corner.
+
+   Squared off when maximized: a rounded maximized window leaves four visible
+   notches of desktop at the screen corners. */
+.app-root {
+  height: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0b0b0b;
+  /* A hairline rim so the window edge stays legible against a dark desktop,
+     standing in for the drop shadow a borderless window does not get. */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.app-root[data-maximized="true"] {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ---- Boot stage entrance ------------------------------------------------
+   The mark settles first, the label follows. Keyed on the label text in the
+   component, so each stage change replays this rather than swapping characters
+   in place, which reads as a glitch at these sizes. */
+.boot-mark {
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: softUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+}
+
+.boot-label {
+  opacity: 0;
+  transform: translateY(6px);
+  animation: softUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
+}
+
+/* ---- Ring ---------------------------------------------------------------
+   A second, slower counter-rotating arc under the primary sweep gives the
+   spinner some parallax instead of one flat rotation. */
+.ring-track { stroke: rgba(255, 255, 255, 0.09); }
+
+.ring-arc {
+  transform-origin: 50% 50%;
+  animation: bootspin 1.15s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+}
+
+.ring-arc-slow {
+  transform-origin: 50% 50%;
+  animation: bootspinReverse 2.6s linear infinite;
+}
+
+@keyframes bootspinReverse { to { transform: rotate(-360deg); } }
+
+/* ---- Quick-lookup overlay ----------------------------------------------
+   A floating bar summoned over other applications, so it reads as a system
+   utility rather than a window: heavy blur, a bright rim so it separates from
+   whatever is behind it, and its own rounded shape (the window under it is
+   transparent). */
+.quick-root {
+  height: 100%;
+  border-radius: 14px;
+  background: rgba(12, 12, 12, 0.82);
+  backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+    0 24px 60px -12px rgba(0, 0, 0, 0.85);
+  animation: quickIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes quickIn {
+  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }

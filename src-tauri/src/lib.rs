@@ -10,8 +10,8 @@ pub mod commands;
 pub mod config;
 pub mod error;
 pub mod integrity;
+pub mod quick;
 pub mod session;
-pub mod window_chrome;
 pub mod updater;
 
 use api::client::ApiClient;
@@ -19,10 +19,36 @@ use commands::AppState;
 use session::SessionStore;
 use tauri::Manager;
 
+/// Binds the system-wide shortcut that summons the overlay.
+///
+/// A failure here is deliberately not fatal: the shortcut can be taken by
+/// another application, and losing one convenience is no reason to refuse to
+/// start. The Settings screen reports whether it bound.
+fn register_quick_shortcut(app: &tauri::AppHandle) {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    let handle = app.clone();
+    let result = app.global_shortcut().on_shortcut(
+        quick::DEFAULT_SHORTCUT,
+        move |_app, _shortcut, event| {
+            // Fire on press only; without this the release fires a second
+            // toggle and the overlay flickers shut again.
+            if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                quick::toggle(&handle);
+            }
+        },
+    );
+
+    if let Err(e) = result {
+        eprintln!("[quick] could not register {}: {e}", quick::DEFAULT_SHORTCUT);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -41,9 +67,10 @@ pub fn run() {
             let client =
                 ApiClient::new(SessionStore::new(fallback)).expect("failed to build the API client");
 
-            if let Some(main) = app.get_webview_window("main") {
-                window_chrome::round_corners(&main);
-            }
+            // The overlay is built once, hidden, so the hotkey only has to
+            // show it. Building on demand would cost a visible webview boot.
+            let _ = quick::create(app.handle());
+            register_quick_shortcut(app.handle());
 
             app.manage(AppState { client });
             app.manage(updater::PendingUpdate::default());
@@ -54,6 +81,7 @@ pub fn run() {
             commands::check_update,
             commands::install_update_and_restart,
             commands::open_external,
+            commands::hide_quick,
             commands::save_recovery_file,
             commands::session_status,
             commands::login,

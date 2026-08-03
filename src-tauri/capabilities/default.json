@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "Main window only. Deliberately does NOT grant opener:default: its http(s)://* scope would let the webview open any URL directly and bypass the open_external allowlist, and reveal-item-in-dir has no scope check at all. open_external calls the opener from Rust, which does not go through this ACL.",
   "windows": [
-    "main"
+    "main",
+    "quick"
   ],
   "permissions": [
     "core:default",
@@ -15,6 +16,11 @@
     "core:window:allow-set-size",
     "core:window:allow-set-min-size",
     "core:window:allow-set-resizable",
-    "core:window:allow-center"
+    "core:window:allow-center",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-is-visible",
+    "global-shortcut:default"
   ]
 }

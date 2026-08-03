@@ -44,5 +44,6 @@ export const ipc = {
   saveRecoveryFile: (code: string) => invoke<string | null>("save_recovery_file", { code }),
   logout: () => invoke<void>("logout"),
   getOverview: () => invoke<Overview>("get_overview"),
+  hideQuick: () => invoke<void>("hide_quick"),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
 }
