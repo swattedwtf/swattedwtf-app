@@ -20,7 +20,7 @@ export function StatCard({
   progress?: number
 }) {
   return (
-    <div className="glass p-5">
+    <div className="glass group p-5 transition-[transform,border-color] duration-300 hover:-translate-y-[2px] hover:border-white/20">
       <div className="flex items-start gap-4">
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-white/5">
           {icon}

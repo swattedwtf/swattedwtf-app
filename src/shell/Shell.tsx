@@ -25,12 +25,22 @@ export function Shell({
   }, [])
 
   return (
-    <div className="flex h-full bg-[#0b0b0b]">
+    <div className="relative flex h-full bg-[#0b0b0b]">
+      {/* Shared with the web dashboard so the two read as one product. */}
+      <div className="app-backdrop">
+        <div className="app-backdrop-wash" />
+      </div>
+
       <Sidebar route={route} onNavigate={onNavigate} />
-      <div className="relative flex-1 overflow-hidden">
+
+      <div className="relative z-10 flex-1 overflow-hidden">
         <div data-tauri-drag-region className="drag absolute inset-x-0 top-0 h-10" />
         <WindowControls />
-        <main className="h-full overflow-y-auto px-8 pb-10 pt-12">{children}</main>
+        <main className="h-full overflow-y-auto px-9 pb-12 pt-12">
+          <div key={route} className="screen-in">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   )

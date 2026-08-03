@@ -11,6 +11,7 @@ pub mod config;
 pub mod error;
 pub mod integrity;
 pub mod session;
+pub mod window_chrome;
 pub mod updater;
 
 use api::client::ApiClient;
@@ -39,6 +40,10 @@ pub fn run() {
 
             let client =
                 ApiClient::new(SessionStore::new(fallback)).expect("failed to build the API client");
+
+            if let Some(main) = app.get_webview_window("main") {
+                window_chrome::round_corners(&main);
+            }
 
             app.manage(AppState { client });
             app.manage(updater::PendingUpdate::default());

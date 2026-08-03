@@ -70,7 +70,7 @@ body {
 
 /* Glass panel, matching the dashboard's card treatment. */
 .glass {
-  background: var(--card);
+  background: color-mix(in oklch, var(--card) 82%, transparent);
   border: 1px solid var(--border);
   border-top-color: var(--glass-edge);
   border-radius: 1rem;
@@ -137,4 +137,88 @@ body {
   opacity: 0;
   transform: translateY(8px);
   animation: softUp 0.7s ease 2.2s forwards;
+}
+
+/* ---- Scrollbars ---------------------------------------------------------
+   Hidden everywhere, but scrolling still works: wheel, trackpad, keyboard and
+   drag-to-scroll are untouched, only the visual track is gone. A frameless
+   app window has no OS chrome, so a native scrollbar reads as a seam in the
+   middle of an otherwise borderless surface. */
+* {
+  scrollbar-width: none;        /* Firefox and the CSS standard */
+  -ms-overflow-style: none;     /* legacy Edge */
+}
+
+*::-webkit-scrollbar {          /* WebView2 and WebKitGTK */
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* ---- Dashboard backdrop -------------------------------------------------
+   The same three-layer surface the web dashboard uses, so the app and the site
+   read as one product: the satin-light artwork, a fine grain, then a darkening
+   wash so dense content stays legible while the light still breathes at the
+   edges. Purely decorative, so it sits behind everything and takes no pointer
+   events. Assets are bundled locally because the CSP forbids remote sources. */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.app-backdrop::before,
+.app-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.app-backdrop::before {
+  background-image: url("/bg/background-auth.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.85;
+}
+
+.app-backdrop::after {
+  background-image: url("/bg/texture.png");
+  background-size: 180px;
+  opacity: 0.1;
+  mix-blend-mode: overlay;
+}
+
+/* Darkening wash, as its own element so it layers above both pseudo-elements. */
+.app-backdrop-wash {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 95% 80% at 35% 30%, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.35) 70%, transparent),
+    color-mix(in oklch, var(--background) 20%, transparent);
+}
+
+/* ---- Motion -------------------------------------------------------------
+   A short rise-and-fade on screen changes. Long enough to register as motion,
+   short enough that it never delays the click. */
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.screen-in {
+  animation: screenIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Respect a stated preference for less motion: the boot reveal, the spinner
+   and these transitions all stop animating rather than being merely faster. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
