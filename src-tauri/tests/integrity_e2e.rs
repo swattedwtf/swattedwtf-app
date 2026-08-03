@@ -31,5 +31,13 @@ fn the_generated_manifest_verifies_against_the_generated_key() {
     let report = swattedwtf_app_lib::integrity::verify_integrity(dist, &manifest, &pubkey);
 
     assert!(report.ok, "generated manifest must verify: {:?}", report.changed);
-    assert_eq!(report.manifest_version, "0.1.0");
+
+    // The workflow builds the manifest version from the git tag, so this also
+    // catches a tag pushed without bumping Cargo.toml, which would ship a
+    // binary whose reported version disagrees with the release it came from.
+    assert_eq!(
+        report.manifest_version,
+        env!("CARGO_PKG_VERSION"),
+        "manifest version (from the git tag) must match the crate version",
+    );
 }
