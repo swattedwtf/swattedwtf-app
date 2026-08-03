@@ -31,7 +31,11 @@ pub fn run() {
                 .path()
                 .app_local_data_dir()
                 .map(|d| d.join("session.json"))
-                .unwrap_or_else(|_| std::path::PathBuf::from("session.json"));
+                // Never the process CWD: an AppImage launched from a service or
+                // a .desktop entry with a stripped environment would otherwise
+                // drop a session token into whatever directory it started in,
+                // possibly a synced or shared folder.
+                .unwrap_or_else(|_| std::env::temp_dir().join("tf.swattedw.desktop-session.json"));
 
             let client =
                 ApiClient::new(SessionStore::new(fallback)).expect("failed to build the API client");

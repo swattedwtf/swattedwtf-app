@@ -60,10 +60,14 @@ pub async fn get_overview(state: State<'_, AppState>) -> Result<overview::Overvi
 /// INTEGRITY_SIGNING_KEY secret; a developer sets it to whatever seed they
 /// generated locally).
 ///
-/// The all-zero default means "no key configured", and every manifest fails
-/// against it. That is deliberate: an unconfigured build reports tampering
-/// rather than silently passing, so a release that forgot the key is loudly
-/// broken instead of quietly unverified.
+/// The all-zero default means "no key configured" and is rejected explicitly by
+/// verify_integrity, so an unconfigured build reports tampering rather than
+/// silently passing.
+///
+/// It is rejected by an explicit check rather than left to fail verification on
+/// its own: the all-zero encoding is a valid ed25519 point of order 4, against
+/// which a signature over any message can be forged. Relying on it to fail
+/// would have meant an unconfigured build accepting an attacker's manifest.
 const INTEGRITY_PUBKEY_HEX: &str = match option_env!("INTEGRITY_PUBKEY") {
     Some(key) => key,
     None => "0000000000000000000000000000000000000000000000000000000000000000",
@@ -170,8 +174,11 @@ pub fn open_external(app: AppHandle, url: String) -> Result<(), AppError> {
         return Err(AppError::Internal("blocked external url".into()));
     }
 
+    // The NORMALISED url, not the caller's raw string: WHATWG parsing strips
+    // ASCII tabs, newlines and leading control characters anywhere in the input,
+    // so the two can differ even when validation passed.
     tauri_plugin_opener::OpenerExt::opener(&app)
-        .open_url(url, None::<&str>)
+        .open_url(parsed.as_str(), None::<&str>)
         .map_err(|e| AppError::Internal(e.to_string()))
 }
 

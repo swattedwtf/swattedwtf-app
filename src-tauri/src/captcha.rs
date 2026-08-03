@@ -47,6 +47,15 @@ pub fn token_from_url(url: &str) -> Option<String> {
         .map(|(_, v)| v.into_owned())
 }
 
+/// True when a URL is on the same origin as the API. Navigation away from it is
+/// refused, so the helper window can only ever show our own captcha page.
+fn is_api_origin(u: &url::Url) -> bool {
+    let Ok(base) = url::Url::parse(api_base()) else { return false };
+    u.scheme() == base.scheme()
+        && u.host_str() == base.host_str()
+        && u.port_or_known_default() == base.port_or_known_default()
+}
+
 /// Opens the helper window and resolves with the Turnstile token.
 ///
 /// Times out rather than hanging forever if the user walks away, and closes the
@@ -75,7 +84,12 @@ pub async fn solve(app: &AppHandle) -> Result<String, AppError> {
                     }
                 }
             }
-            true
+            // Pin navigation to the API origin. Without this the helper is a
+            // general-purpose browser window with no address bar inside a
+            // trusted-looking app: an open redirect on the captcha page, or a
+            // compromised CDN, would turn it into a phishing surface, and it
+            // would happily render file:// and data:: documents.
+            is_api_origin(&u)
         })
         .build()
         .map_err(|e| AppError::Internal(e.to_string()))?;

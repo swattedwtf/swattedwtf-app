@@ -70,25 +70,48 @@ impl SessionStore {
         let blob = encode_jar(jar)?;
         if let Ok(entry) = self.entry() {
             if entry.set_password(&blob).is_ok() {
+                // A machine can gain a Secret Service provider after first run
+                // (installing gnome-keyring, say). Without this, the plaintext
+                // session written on that first launch would sit on disk
+                // indefinitely while every later save went to the keychain.
+                let _ = std::fs::remove_file(&self.fallback_path);
                 return Ok(());
             }
         }
         self.write_fallback(&blob)
     }
 
+    /// Writes the fallback file, created 0600 from the outset.
+    ///
+    /// std::fs::write would create it 0644 (umask permitting) and only then
+    /// chmod, leaving a window in which another local user can open the file and
+    /// keep the descriptor. This holds a live session token, so that window
+    /// matters on a shared machine.
     fn write_fallback(&self, blob: &str) -> Result<(), AppError> {
+        use std::io::Write;
+
         if let Some(dir) = self.fallback_path.parent() {
             std::fs::create_dir_all(dir).map_err(|e| AppError::Internal(e.to_string()))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+            }
         }
-        std::fs::write(&self.fallback_path, blob).map_err(|e| AppError::Internal(e.to_string()))?;
+
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create(true).truncate(true);
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(
-                &self.fallback_path,
-                std::fs::Permissions::from_mode(0o600),
-            );
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
         }
+
+        let mut file = opts
+            .open(&self.fallback_path)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        file.write_all(blob.as_bytes())
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         Ok(())
     }
 

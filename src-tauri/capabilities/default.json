@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Main window only. Deliberately does NOT grant opener:default: its http(s)://* scope would let the webview open any URL directly and bypass the open_external allowlist, and reveal-item-in-dir has no scope check at all. open_external calls the opener from Rust, which does not go through this ACL.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
-    "opener:default",
     "core:app:allow-version",
     "core:window:allow-close",
     "core:window:allow-minimize",

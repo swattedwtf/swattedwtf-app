@@ -58,6 +58,24 @@ fn failed(reason: &str) -> IntegrityReport {
     }
 }
 
+/// True for a plain relative path that stays inside the bundle. Rejects `..`
+/// segments, absolute paths, and Windows drive or UNC prefixes.
+fn is_safe_relative_path(path: &str) -> bool {
+    use std::path::{Component, Path};
+
+    if path.is_empty() {
+        return false;
+    }
+    // Windows accepts both separators, so normalise before inspecting.
+    let normalised = path.replace('\\', "/");
+    if normalised.starts_with('/') || normalised.contains(':') {
+        return false;
+    }
+    Path::new(&normalised)
+        .components()
+        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
 pub fn verify_integrity(resource_dir: &Path, manifest_json: &str, pubkey: &[u8]) -> IntegrityReport {
     let signed: SignedManifest = match serde_json::from_str(manifest_json) {
         Ok(v) => v,
@@ -77,6 +95,16 @@ pub fn verify_integrity(resource_dir: &Path, manifest_json: &str, pubkey: &[u8])
         Ok(k) => k,
         Err(_) => return failed("<bad public key>"),
     };
+
+    // The all-zero key is the "not configured" sentinel, and it must be rejected
+    // explicitly rather than relied on to fail verification. It is a valid curve
+    // point of ORDER 4, so [k]A is the identity whenever k is a multiple of 4,
+    // and an attacker can retry until that holds to forge a signature over any
+    // message. Trusting it to fail was the exact opposite of what it does.
+    if key_bytes == [0u8; 32] {
+        return failed("<no integrity key configured>");
+    }
+
     let key = match VerifyingKey::from_bytes(&key_bytes) {
         Ok(k) => k,
         Err(_) => return failed("<bad public key>"),
@@ -89,12 +117,22 @@ pub fn verify_integrity(resource_dir: &Path, manifest_json: &str, pubkey: &[u8])
         Ok(s) => s,
         Err(_) => return failed("<manifest signature>"),
     };
-    if key.verify(canon.as_bytes(), &sig).is_err() {
+    // verify_strict, not verify: it rejects small-order and non-canonical public
+    // keys, closing the same class of forgery the sentinel check above covers.
+    if key.verify_strict(canon.as_bytes(), &sig).is_err() {
         return failed("<manifest signature>");
     }
 
     let mut changed = Vec::new();
     for entry in &signed.payload.files {
+        // A manifest path is a relative path INSIDE the bundle. Rejecting
+        // traversal and absolute paths keeps a manifest from turning the check
+        // into a file-existence oracle for arbitrary paths on the host. This is
+        // defence in depth: reaching here already requires the release key.
+        if !is_safe_relative_path(&entry.path) {
+            changed.push(entry.path.clone());
+            continue;
+        }
         let full = resource_dir.join(&entry.path);
         match std::fs::read(&full) {
             Ok(bytes) => {
@@ -237,6 +275,46 @@ mod tests {
 
         let report = verify_integrity(&dir, &m, key.verifying_key().as_bytes());
         assert!(report.ok, "{:?}", report.changed);
+    }
+
+
+    /// The all-zero key is a valid order-4 curve point, so signatures over
+    /// arbitrary messages can be forged against it. It must be rejected as a
+    /// sentinel rather than trusted to fail verification on its own.
+    #[test]
+    fn rejects_the_unconfigured_all_zero_key_outright() {
+        let dir = tempdir();
+        fs::write(dir.join("a.js"), b"hello").unwrap();
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        let m = signed_manifest(&[("a.js", &sha256_of(b"hello"))], &key);
+
+        let report = verify_integrity(&dir, &m, &[0u8; 32]);
+        assert!(!report.ok);
+        assert_eq!(report.changed, vec!["<no integrity key configured>".to_string()]);
+    }
+
+    #[test]
+    fn rejects_a_manifest_path_that_escapes_the_resource_dir() {
+        let dir = tempdir();
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        for bad in ["../outside.txt", "/etc/passwd", "a/../../b", "C:/windows/x", "..\\win.txt"] {
+            let m = signed_manifest(&[(bad, &sha256_of(b"whatever"))], &key);
+            let report = verify_integrity(&dir, &m, key.verifying_key().as_bytes());
+            assert!(!report.ok, "{bad} should be rejected");
+            assert_eq!(report.changed, vec![bad.to_string()]);
+        }
+    }
+
+    #[test]
+    fn still_accepts_ordinary_nested_paths() {
+        let dir = tempdir();
+        fs::create_dir_all(dir.join("assets")).unwrap();
+        fs::write(dir.join("assets/index.js"), b"hello").unwrap();
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        let m = signed_manifest(&[("assets/index.js", &sha256_of(b"hello"))], &key);
+
+        let report = verify_integrity(&dir, &m, key.verifying_key().as_bytes());
+        assert!(report.ok, "changed: {:?}", report.changed);
     }
 
     fn tempdir() -> std::path::PathBuf {
