@@ -73,3 +73,16 @@ body {
 /* Frameless drag regions. Interactive children must set -webkit-app-region: no-drag. */
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
+
+/* Boot stage: the sweeping ring and its shimmering label. */
+@keyframes bootspin { to { transform: rotate(360deg); } }
+@keyframes shimmer { to { background-position: -220% 0; } }
+
+.shimmer-label {
+  background: linear-gradient(90deg, rgba(255,255,255,0.45) 0%, #fff 45%, rgba(255,255,255,0.45) 90%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
