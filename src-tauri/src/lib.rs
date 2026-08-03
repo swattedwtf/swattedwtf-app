@@ -4,7 +4,11 @@
 //! All HTTP and all secret storage stay on this side of the IPC boundary: the
 //! webview is never handed a session token.
 
+pub mod api;
 pub mod config;
+pub mod error;
+mod integrity;
+pub mod session;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
