@@ -1,0 +1,114 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+# One release build per tag. A superseded run would race the first on the
+# same draft release and attach duplicate assets.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - run: npm ci
+
+      - name: Build the frontend
+        run: npm run build
+
+      # Order matters: the manifest hashes dist/, so it must run AFTER the
+      # frontend build and BEFORE the Tauri bundle packages it as a resource.
+      # The generator prints the public half, which the Rust side needs compiled
+      # in, so we capture it here rather than storing it in two places.
+      - name: Generate the signed integrity manifest
+        id: integrity
+        shell: bash
+        env:
+          INTEGRITY_SIGNING_KEY: ${{ secrets.INTEGRITY_SIGNING_KEY }}
+        run: |
+          mkdir -p src-tauri/resources
+          out=$(node scripts/gen-integrity.mjs dist src-tauri/resources/integrity.json "${GITHUB_REF_NAME#v}")
+          echo "$out"
+          pubkey=$(echo "$out" | grep -o 'pubkey [a-f0-9]*' | cut -d' ' -f2)
+          if [ -z "$pubkey" ]; then
+            echo "::error::integrity generator did not print a public key"
+            exit 1
+          fi
+          echo "pubkey=$pubkey" >> "$GITHUB_OUTPUT"
+
+      # Proves the generator and the Rust verifier agree on the canonical signed
+      # bytes before anything is published. They sign the same payload in two
+      # languages, so a mismatch would otherwise ship as a spurious "this copy
+      # has been modified" screen on every launch.
+      - name: Verify the manifest against the Rust verifier
+        shell: bash
+        working-directory: src-tauri
+        env:
+          INTEGRITY_PUBKEY: ${{ steps.integrity.outputs.pubkey }}
+        run: cargo test --test integrity_e2e
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Compiled into the binary so the app can verify its own bundle.
+          INTEGRITY_PUBKEY: ${{ steps.integrity.outputs.pubkey }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseDraft: true
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
+
+      # The installers are unsigned, so published hashes are the only way for a
+      # user to check that what they downloaded is what CI built. The README
+      # points at these files.
+      - name: Publish artifact hashes
+        shell: bash
+        working-directory: src-tauri/target/release/bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sums="$RUNNER_TEMP/SHA256SUMS-${{ matrix.platform }}.txt"
+          find . -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' \) \
+            -exec sha256sum {} \; > "$sums"
+          if [ ! -s "$sums" ]; then
+            echo "::error::no installers found to hash"
+            exit 1
+          fi
+          cat "$sums"
+          gh release upload "${{ github.ref_name }}" "$sums" --clobber
