@@ -3,6 +3,8 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Manual trigger, so a release can be rebuilt without moving the tag.
+  workflow_dispatch:
 
 # One release build per tag. A superseded run would race the first on the
 # same draft release and attach duplicate assets.

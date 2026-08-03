@@ -3,6 +3,8 @@ name: ci
 on:
   push:
   pull_request:
+  # Manual trigger, so a release can be rebuilt without moving the tag.
+  workflow_dispatch:
 
 # A PR branch in this repo triggers both `push` and `pull_request`. Grouping by
 # ref keeps only the newest run of each alive instead of paying for both twice.
