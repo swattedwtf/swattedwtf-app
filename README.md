@@ -13,6 +13,16 @@ macOS build in v1.
 > welcome reveal), plus the Windows SmartScreen dialog described below. No
 > screenshots exist yet, so this README describes both in words.
 
+> **Pre-release status.** This app has not shipped a release yet, and parts of
+> this README describe the intended behaviour of code that is still landing.
+> Accurate today: the Rust-side session model, the signed integrity manifest
+> format and its verifier, and the network egress described below. Not yet
+> wired: the updater (no `plugins.updater` block or public key in
+> `tauri.conf.json` yet) and the bundling of `integrity.json` as an app
+> resource. This note comes out when both are in place, before the first
+> release. Do not treat the update-signing section as describing shipped
+> behaviour until then.
+
 ## What v1 does
 
 - A boot sequence: integrity check, update check, then a branded welcome reveal.
