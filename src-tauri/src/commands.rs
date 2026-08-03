@@ -19,9 +19,12 @@ pub struct SessionStatus {
     pub authenticated: bool,
 }
 
+// async so it does not run inline on the IPC thread and take the jar mutex there.
 #[tauri::command]
-pub fn session_status(state: State<'_, AppState>) -> SessionStatus {
-    SessionStatus { authenticated: state.client.has_session() }
+pub async fn session_status(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
+    // An async command borrowing State must return Result; the frontend still
+    // receives the plain object on the success path.
+    Ok(SessionStatus { authenticated: state.client.has_session() })
 }
 
 #[tauri::command]
@@ -73,8 +76,9 @@ const INTEGRITY_PUBKEY_HEX: &str = match option_env!("INTEGRITY_PUBKEY") {
     None => "0000000000000000000000000000000000000000000000000000000000000000",
 };
 
+// async: this SHA-256s the whole bundle, which must not run on the UI thread.
 #[tauri::command]
-pub fn verify_integrity(app: AppHandle) -> crate::integrity::IntegrityReport {
+pub async fn verify_integrity(app: AppHandle) -> crate::integrity::IntegrityReport {
     let resource_dir = match app.path().resource_dir() {
         Ok(d) => d,
         Err(e) => {
@@ -153,7 +157,7 @@ pub async fn save_recovery_file(app: AppHandle, code: String) -> Result<Option<S
 /// would also match `https://github.com.evil.test/...`, so each candidate is
 /// parsed and its host compared exactly.
 #[tauri::command]
-pub fn open_external(app: AppHandle, url: String) -> Result<(), AppError> {
+pub async fn open_external(app: AppHandle, url: String) -> Result<(), AppError> {
     let parsed = url::Url::parse(&url).map_err(|_| AppError::Internal("invalid url".into()))?;
     if parsed.scheme() != "https" {
         return Err(AppError::Internal("blocked external url".into()));

@@ -14,6 +14,7 @@ import { Home } from "./dashboard/Home"
 import { Settings } from "./settings/Settings"
 import { Shell } from "./shell/Shell"
 import { WindowControls } from "./shell/WindowControls"
+import { resizeTo } from "./shell/window"
 import { isUnauthorized, messageOf } from "./lib/errors"
 import { ipc, type Overview } from "./lib/ipc"
 import "./theme.css"
@@ -115,6 +116,9 @@ export default function App() {
   }, [])
 
   const handleLoggedOut = useCallback(() => {
+    // Back to splash size: the login form is 320px wide and would otherwise sit
+    // marooned in a 1180x760 field of black.
+    void resizeTo("boot")
     setOverview(null)
     setRoute("/dashboard")
     setAuth({ view: "login" })

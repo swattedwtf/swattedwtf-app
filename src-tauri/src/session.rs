@@ -67,9 +67,14 @@ impl SessionStore {
     }
 
     pub fn save(&self, jar: &CookieStore) -> Result<(), AppError> {
-        let blob = encode_jar(jar)?;
+        self.save_blob(&encode_jar(jar)?)
+    }
+
+    /// Persists an already-encoded jar, so callers holding the jar lock can
+    /// encode under it and release it before this blocking write.
+    pub fn save_blob(&self, blob: &str) -> Result<(), AppError> {
         if let Ok(entry) = self.entry() {
-            if entry.set_password(&blob).is_ok() {
+            if entry.set_password(blob).is_ok() {
                 // A machine can gain a Secret Service provider after first run
                 // (installing gnome-keyring, say). Without this, the plaintext
                 // session written on that first launch would sit on disk
@@ -78,7 +83,7 @@ impl SessionStore {
                 return Ok(());
             }
         }
-        self.write_fallback(&blob)
+        self.write_fallback(blob)
     }
 
     /// Writes the fallback file, created 0600 from the outset.

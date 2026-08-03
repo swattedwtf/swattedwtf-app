@@ -42,16 +42,16 @@ export function Home({ overview }: { overview: Overview }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={<Zap className={icon} aria-hidden="true" />}
-          label="Requests (30d)"
+          label="Requests (this month)"
           value={formatCount(usage.monthCount)}
           progress={plan.monthlyLimit > 0 ? (usage.monthCount / plan.monthlyLimit) * 100 : 0}
-          caption={`of ${formatCount(plan.monthlyLimit)} per 30 days`}
+          caption={`of ${formatCount(plan.monthlyLimit)} this month`}
         />
         <StatCard
           icon={<Crown className={icon} aria-hidden="true" />}
           label="Account Tier"
           value={plan.label}
-          caption={`Since ${formatSince(plan.since)}`}
+          caption={`Member since ${formatSince(plan.since)}`}
         />
         <StatCard
           icon={<Search className={icon} aria-hidden="true" />}

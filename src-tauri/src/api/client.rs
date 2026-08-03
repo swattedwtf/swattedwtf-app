@@ -50,12 +50,20 @@ impl ApiClient {
 
     /// Writes the current jar back to the keychain. Call after any request that
     /// can set or clear the session cookie.
+    ///
+    /// The jar lock is released BEFORE the keychain write. That write is a
+    /// synchronous D-Bus round-trip on Linux and can block for as long as it
+    /// takes the user to type a keyring password; holding the lock across it
+    /// would stall every concurrent request through this client.
     pub fn persist(&self) -> Result<(), AppError> {
-        let jar = self
-            .jar
-            .lock()
-            .map_err(|_| AppError::Internal("cookie jar lock poisoned".into()))?;
-        self.store.save(&jar)
+        let blob = {
+            let jar = self
+                .jar
+                .lock()
+                .map_err(|_| AppError::Internal("cookie jar lock poisoned".into()))?;
+            crate::session::encode_jar(&jar)?
+        };
+        self.store.save_blob(&blob)
     }
 
     /// Drops the session locally, from both the live jar and the keychain, so

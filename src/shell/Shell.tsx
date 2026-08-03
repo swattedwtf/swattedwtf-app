@@ -1,13 +1,7 @@
 import { useEffect, type ReactNode } from "react"
-import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window"
+import { resizeTo } from "./window"
 import { Sidebar } from "./Sidebar"
 import { WindowControls } from "./WindowControls"
-
-/** Shell dimensions. The window boots at splash size and grows on arrival here. */
-const SHELL_WIDTH = 1180
-const SHELL_HEIGHT = 760
-const MIN_WIDTH = 900
-const MIN_HEIGHT = 600
 
 /**
  * App shell.
@@ -27,20 +21,7 @@ export function Shell({
   children: ReactNode
 }) {
   useEffect(() => {
-    const win = getCurrentWindow()
-    // The boot window is fixed at 520x620; entering the shell is where it
-    // becomes a real resizable app window. Guarded because these reject outside
-    // a Tauri host (for example in a browser during development).
-    void (async () => {
-      try {
-        await win.setResizable(true)
-        await win.setMinSize(new LogicalSize(MIN_WIDTH, MIN_HEIGHT))
-        await win.setSize(new LogicalSize(SHELL_WIDTH, SHELL_HEIGHT))
-        await win.center()
-      } catch {
-        // Not running inside a Tauri window. Layout still renders.
-      }
-    })()
+    void resizeTo("shell")
   }, [])
 
   return (
