@@ -51,6 +51,20 @@ jobs:
       - name: Build the frontend
         run: npm run build
 
+      # tauri.conf.json declares resources/integrity.json as a bundled resource,
+      # and tauri-build fails the compile outright if a declared resource is
+      # missing. The real manifest is signed with the release key and is
+      # generated only in the release workflow, so CI makes a throwaway one with
+      # an ephemeral key. That also exercises the generator on every push, which
+      # is where a break in it would otherwise go unnoticed until a release.
+      #
+      # Must run AFTER the frontend build: the generator hashes dist/.
+      - name: Generate a throwaway integrity manifest
+        run: |
+          mkdir -p src-tauri/resources
+          INTEGRITY_SIGNING_KEY=$(openssl rand -hex 32) \
+            node scripts/gen-integrity.mjs dist src-tauri/resources/integrity.json 0.0.0-ci
+
       - name: Run the Rust tests
         working-directory: src-tauri
         run: cargo test
