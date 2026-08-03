@@ -1,6 +1,6 @@
 import { ipc } from "../lib/ipc"
 
-const RELEASES_URL = "https://github.com/sujrb/swattedwtf-app/releases"
+const RELEASES_URL = "https://github.com/swattedwtf/swattedwtf-app/releases"
 const MAX_LISTED = 10
 
 /**

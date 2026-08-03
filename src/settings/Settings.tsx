@@ -5,7 +5,7 @@ import { ipc, type Overview } from "../lib/ipc"
 import { messageOf } from "../lib/errors"
 import { formatSince } from "../lib/format"
 
-const REPO_URL = "https://github.com/sujrb/swattedwtf-app"
+const REPO_URL = "https://github.com/swattedwtf/swattedwtf-app"
 const WEB_SETTINGS_URL = "https://swattedw.tf/dashboard/settings"
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

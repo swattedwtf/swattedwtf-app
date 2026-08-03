@@ -13,15 +13,10 @@ macOS build in v1.
 > welcome reveal), plus the Windows SmartScreen dialog described below. No
 > screenshots exist yet, so this README describes both in words.
 
-> **Pre-release status.** This app has not shipped a release yet, and parts of
-> this README describe the intended behaviour of code that is still landing.
-> Accurate today: the Rust-side session model, the signed integrity manifest
-> format and its verifier, and the network egress described below. Not yet
-> wired: the updater (no `plugins.updater` block or public key in
-> `tauri.conf.json` yet) and the bundling of `integrity.json` as an app
-> resource. This note comes out when both are in place, before the first
-> release. Do not treat the update-signing section as describing shipped
-> behaviour until then.
+> **Pre-release status.** Version 0.1.0 is a first release and has not yet been
+> run widely. Linux builds are published; the Windows installer is produced by
+> CI and is not in this release. The updater and the bundled integrity manifest
+> are both wired up as described below.
 
 ## What v1 does
 
@@ -36,7 +31,7 @@ Those modules are not in this release.
 ## Installing
 
 Downloads are on the
-[Releases page](https://github.com/sujrb/swattedwtf-app/releases).
+[Releases page](https://github.com/swattedwtf/swattedwtf-app/releases).
 
 ### Windows: the SmartScreen warning
 
@@ -203,4 +198,4 @@ name is exactly what the integrity check is meant to flag, and that check is a
 hint rather than a guarantee, since a hostile fork would simply remove it.
 
 Official builds come only from
-[the releases page](https://github.com/sujrb/swattedwtf-app/releases).
+[the releases page](https://github.com/swattedwtf/swattedwtf-app/releases).

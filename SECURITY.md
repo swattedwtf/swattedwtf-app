@@ -10,7 +10,7 @@ Please report privately first, not in a public issue.
 
 1. Preferred: open a private report through GitHub's
    **Security > Report a vulnerability** on
-   [this repository](https://github.com/sujrb/swattedwtf-app/security/advisories/new).
+   [this repository](https://github.com/swattedwtf/swattedwtf-app/security/advisories/new).
 2. If that is unavailable to you, email `support@swattedw.tf` with "security" in
    the subject.
 
