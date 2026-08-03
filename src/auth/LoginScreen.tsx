@@ -71,7 +71,7 @@ export function LoginScreen({
             if (e.key === "Enter") void submit()
           }}
           placeholder="0000 0000 0000"
-          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-center font-mono text-lg tracking-[0.22em] outline-none placeholder:text-white/20 focus:border-white/40"
+          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-center font-mono text-lg tabular-nums tracking-[0.22em] shadow-[inset_0_1px_2px_0_rgba(0,0,0,0.45)] outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
         />
 
         {error ? (
@@ -80,13 +80,17 @@ export function LoginScreen({
           </p>
         ) : null}
 
+        {/* The label does not change while submitting: swapping "Sign in" for
+            "Verifying..." resizes the control under the pointer mid-press. The
+            busy state is aria-busy plus the ring the .btn-primary rules draw. */}
         <button
           type="button"
           disabled={!complete || busy}
+          aria-busy={busy || undefined}
           onClick={() => void submit()}
-          className="mt-5 h-10 w-full rounded-lg bg-white font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
+          className="btn-primary mt-5 w-full"
         >
-          {busy ? "Verifying..." : "Sign in"}
+          Sign in
         </button>
 
         <button

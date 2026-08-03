@@ -66,7 +66,7 @@ export function RegisterScreen({
             if (e.key === "Enter") void submit()
           }}
           placeholder="you@example.com"
-          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-sm outline-none placeholder:text-white/20 focus:border-white/40"
+          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-sm shadow-[inset_0_1px_2px_0_rgba(0,0,0,0.45)] outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
         />
         <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
           Optional, used only for account recovery.
@@ -78,13 +78,15 @@ export function RegisterScreen({
           </p>
         ) : null}
 
+        {/* Label held steady while submitting; see LoginScreen. */}
         <button
           type="button"
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={() => void submit()}
-          className="mt-5 h-10 w-full rounded-lg bg-white font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
+          className="btn-primary mt-5 w-full"
         >
-          {busy ? "Creating..." : "Create account"}
+          Create account
         </button>
 
         <button

@@ -66,7 +66,7 @@ export function TwoFactorScreen({
             if (e.key === "Enter") void submit()
           }}
           placeholder="000000"
-          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-center font-mono text-lg tracking-[0.3em] outline-none placeholder:text-white/20 focus:border-white/40"
+          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-center font-mono text-lg tabular-nums tracking-[0.3em] shadow-[inset_0_1px_2px_0_rgba(0,0,0,0.45)] outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
         />
         <p className="mt-2 text-center text-xs text-[var(--color-muted-foreground)]">
           Enter the 6-digit code from your authenticator app.
@@ -78,13 +78,15 @@ export function TwoFactorScreen({
           </p>
         ) : null}
 
+        {/* Label held steady while submitting; see LoginScreen. */}
         <button
           type="button"
           disabled={!complete || busy}
+          aria-busy={busy || undefined}
           onClick={() => void submit()}
-          className="mt-5 h-10 w-full rounded-lg bg-white font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
+          className="btn-primary mt-5 w-full"
         >
-          {busy ? "Verifying..." : "Continue"}
+          Continue
         </button>
 
         <button

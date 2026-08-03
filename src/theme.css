@@ -72,20 +72,332 @@ body {
   user-select: none;
 }
 
-/* Glass panel, matching the dashboard's card treatment. */
+/* ---- Panel material ----------------------------------------------------
+   The web's layered panel, not a flat fill inside a uniform 1px border. A
+   uniform border is a single grey that disappears wherever the artwork behind
+   it brightens, which is exactly what happened to the cards on the right of
+   the window. Instead the frame is a *gradient* hairline (bright at the top
+   where a light source would catch it, almost nothing at the bottom) drawn as
+   a 1px pad on the outer element, with the real surface as an inner element on
+   top of it.
+
+   So a panel is two elements:
+
+     <div class="glass"><div class="glass-body"> ... </div></div>
+
+   Panels that are still a single element (settings, the walkthrough) are
+   detected with :has() and keep the older one-element surface plus whatever
+   padding their utility classes ask for. Written this way round, rather than
+   as .glass:not(:has(> .glass-body)), so that a WebView with no :has() support
+   degrades to the old flat card everywhere instead of collapsing every
+   single-element panel to 1px of padding. */
 .glass {
-  background: color-mix(in oklch, var(--card) 82%, transparent);
-  border: 1px solid var(--border);
-  border-top-color: var(--glass-edge);
-  border-radius: 1rem;
+  position: relative;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(21, 21, 21, 0.72), rgba(11, 11, 11, 0.78));
   backdrop-filter: var(--glass-filter);
-  box-shadow: 0 1px 0 0 oklch(1 0 0 / 0.06) inset, 0 8px 30px -12px oklch(0 0 0 / 0.8);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+    0 28px 70px -40px rgba(0, 0, 0, 0.95),
+    0 2px 8px -4px rgba(0, 0, 0, 0.6);
+}
+
+/* Two-element form: the outer element becomes the gradient frame only. Its own
+   backdrop-filter is dropped, or the body would blur an already-blurred
+   backdrop and the surface would go milky. */
+.glass:has(> .glass-body) {
+  padding: 1px;
+  backdrop-filter: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.05) 38%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  box-shadow:
+    0 28px 70px -40px rgba(0, 0, 0, 0.95),
+    0 2px 8px -4px rgba(0, 0, 0, 0.6);
+}
+
+.glass > .glass-body {
+  position: relative;
+  overflow: hidden;
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(21, 21, 21, 0.72), rgba(11, 11, 11, 0.78));
+  backdrop-filter: blur(22px) saturate(1.8) brightness(1.06);
+  padding: 20px;
+}
+
+/* Specular highlight along the top edge, inset from the corners so it reads as
+   light catching a bevel rather than as a second border. */
+.glass > .glass-body::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.30), transparent);
+}
+
+/* The same grain the backdrop uses, so panels are not the only perfectly
+   smooth thing on screen. */
+.glass > .glass-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url("/bg/texture.png") 0 0 / 180px;
+  opacity: 0.05;
+  mix-blend-mode: soft-light;
 }
 
 /* WebKitGTK on some distros lacks backdrop-filter; fall back to a flat card. */
 @supports not (backdrop-filter: blur(1px)) {
-  .glass { background: oklch(0.09 0 0); }
+  .glass { background: linear-gradient(180deg, #151515, #0b0b0b); }
+  .glass > .glass-body { background: linear-gradient(180deg, #151515, #0b0b0b); }
 }
+
+/* ---- Buttons ------------------------------------------------------------
+   Two weights, one shape language. The old primary was `bg-white` dimmed with
+   `disabled:opacity-30`, which composites to a loud mid-grey slab: on the login
+   screen the disabled Sign in button was the brightest object on the screen,
+   louder than the field you were supposed to type into. A disabled control now
+   recedes into the surface instead. */
+.btn-primary,
+.btn-secondary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -0.006em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-primary {
+  padding: 0 20px;
+  background: linear-gradient(180deg, #fff, #e8e8e8);
+  color: #0b0b0b;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
+    0 8px 22px -10px rgba(0, 0, 0, 0.80);
+  transition:
+    transform 90ms cubic-bezier(0.4, 0, 1, 1),
+    box-shadow 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    background 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
+    0 12px 30px -12px rgba(0, 0, 0, 0.85);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 3px 0 rgba(0, 0, 0, 0.24),
+    0 8px 22px -10px rgba(0, 0, 0, 0.80);
+}
+
+.btn-primary:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: default;
+  transform: none;
+}
+
+.btn-secondary {
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  transition:
+    transform 90ms cubic-bezier(0.4, 0, 1, 1),
+    box-shadow 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    background 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.075);
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-secondary:disabled {
+  color: rgba(255, 255, 255, 0.28);
+  cursor: default;
+  transform: none;
+}
+
+/* Denser variant for toolbars and inline actions. */
+.btn-compact {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Busy. The label stays put: swapping "Sign in" for "Verifying..." resizes the
+   button under the pointer at the exact moment it is being pressed. Instead the
+   whole control dims and a ring spins at the trailing edge, absolutely
+   positioned so it costs no layout. */
+@keyframes btnspin { to { transform: rotate(360deg); } }
+
+.btn-primary[aria-busy="true"],
+.btn-secondary[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-primary[aria-busy="true"]::after,
+.btn-secondary[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  margin-top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.7;
+  /* Left running under prefers-reduced-motion: it is a short-lived progress
+     cue on an already-dimmed control, not ambient decoration, and a frozen
+     ring would read as a static glyph rather than as work in progress. */
+  animation: btnspin 900ms linear infinite;
+}
+
+/* Keyboard focus. Two rings so it survives on both light and dark surfaces:
+   a gap in the window's own background, then the bright ring. */
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px rgba(255, 255, 255, 0.55);
+}
+
+/* Text fields get a quieter version. The login and 2FA fields are autofocused,
+   so their focus state is the screen's resting state, and the full ring at 0.55
+   white simply becomes the new loudest object, which is the exact problem the
+   disabled button had. A tight halo plus the field's own brightened border is
+   enough to say "type here". */
+input:focus-visible,
+textarea:focus-visible {
+  box-shadow:
+    inset 0 1px 2px 0 rgba(0, 0, 0, 0.45),
+    0 0 0 3px rgba(255, 255, 255, 0.10);
+}
+
+/* Composed with the buttons' own shadows, which would otherwise be dropped. */
+.btn-primary:focus-visible {
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
+    0 0 0 2px var(--background),
+    0 0 0 4px rgba(255, 255, 255, 0.55);
+}
+
+.btn-secondary:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 0 0 2px var(--background),
+    0 0 0 4px rgba(255, 255, 255, 0.55);
+}
+
+/* ---- Stat tiles ---------------------------------------------------------
+   The four hero numbers share a baseline: the label reserves two lines' worth
+   of height whether or not it wraps, so "Requests (this month)" no longer
+   pushes its own value 25px below the other three. */
+/* 13px leading so a two-line label is exactly the 26px the one-line labels
+   reserve. Leaving it at the font's own leading made the wrapped label 30px
+   and the value under it still sat 4px low. */
+.stat-label {
+  min-height: 26px;
+  line-height: 13px;
+}
+
+.stat-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.stat-card {
+  container-type: inline-size;
+  transition:
+    transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    background 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Four across starts at lg (1024px), but the window's minimum is 1040px, where
+   each card is only 174px wide. Beside a 36px icon that leaves 80px of text,
+   and a six-figure total truncates to "18,...". Under ~205px the icon moves
+   above the text instead, which gives the number the card's full width and
+   also keeps every label inside the two lines the row's shared baseline
+   assumes. A container query rather than a media query: what matters is how
+   wide the card ended up, not how wide the window is. */
+@container (max-width: 205px) {
+  .stat-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+/* Lifts, and the frame's top highlight brightens as though the light source
+   were now catching more of the bevel. */
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.stat-card:hover:has(> .glass-body) {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.24) 0%,
+    rgba(255, 255, 255, 0.05) 38%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+}
+
+/* The fill grows from nothing to its share of the limit, one card after the
+   next, so the row resolves rather than appearing pre-filled. */
+@keyframes statfill { from { width: 0; } to { width: var(--fill, 0%); } }
+
+.stat-fill {
+  width: var(--fill, 0%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 0 8px -1px rgba(255, 255, 255, 0.35);
+  animation: statfill 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stat-grid > *:nth-child(1) .stat-fill { animation-delay: 0ms; }
+.stat-grid > *:nth-child(2) .stat-fill { animation-delay: 120ms; }
+.stat-grid > *:nth-child(3) .stat-fill { animation-delay: 240ms; }
+.stat-grid > *:nth-child(4) .stat-fill { animation-delay: 360ms; }
 
 /* Frameless drag regions.
    -webkit-app-region is an Electron feature and does NOTHING in Tauri, which
@@ -194,13 +506,17 @@ body {
   mix-blend-mode: overlay;
 }
 
-/* Darkening wash, as its own element so it layers above both pseudo-elements. */
+/* Darkening wash, as its own element so it layers above both pseudo-elements.
+   The radial has to cover the whole window and never reach transparent: the
+   previous one fell off to nothing well before the right edge, leaving the
+   right third of the shell undarkened, and the panels there lost their frames
+   against it entirely. A flat linear underneath guarantees a floor. */
 .app-backdrop-wash {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 95% 80% at 35% 30%, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.35) 70%, transparent),
-    color-mix(in oklch, var(--background) 20%, transparent);
+    radial-gradient(ellipse 120% 100% at 30% 25%, rgba(0, 0, 0, 0.70), rgba(0, 0, 0, 0.52) 60%, rgba(0, 0, 0, 0.42) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.45));
 }
 
 /* ---- Motion -------------------------------------------------------------
@@ -256,6 +572,14 @@ body {
     animation-duration: 0.12s !important;
     animation-delay: 0s !important;
   }
+
+  /* The stat fills land at their value immediately, all four together. */
+  .stat-fill {
+    animation-duration: 0.12s !important;
+    animation-delay: 0s !important;
+  }
+
+  .stat-card { transition: none !important; }
 }
 
 /* ---- Window shape -------------------------------------------------------

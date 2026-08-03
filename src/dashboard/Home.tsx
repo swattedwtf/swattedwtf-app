@@ -39,7 +39,10 @@ export function Home({ overview }: { overview: Overview }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Four across from lg, not xl: the window's minimum width is 1040px, so
+          an xl breakpoint leaves two very wide half-cards for every size
+          between 1040 and 1279. */}
+      <div className="stat-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={<Zap className={icon} aria-hidden="true" />}
           label="Requests (this month)"
@@ -71,33 +74,31 @@ export function Home({ overview }: { overview: Overview }) {
       <QuickActions />
       <UsageChart series={usage.series} />
 
-      <div className="glass p-6">
-        <div className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-[var(--muted-foreground)]" aria-hidden="true" />
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-            Plan Order Status
-          </h2>
-        </div>
+      <div className="glass">
+        <div className="glass-body">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-[var(--muted-foreground)]" aria-hidden="true" />
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              Plan Order Status
+            </h2>
+          </div>
 
-        <div className="flex flex-col items-center px-6 py-8 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5">
-            <Receipt className="h-5 w-5 text-[var(--muted-foreground)]" aria-hidden="true" />
-          </span>
-          <h3 className="mt-4 text-sm font-semibold tracking-tight">No Active Orders</h3>
-          <p className="mt-1 max-w-md text-xs leading-relaxed text-[var(--muted-foreground)]">
-            Upgrade your plan to unlock more features, higher lookup limits, and priority support.
-          </p>
-          <button
-            type="button"
-            onClick={() => void openPlans()}
-            className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/90"
-          >
-            View plans
-            <ExternalLink className="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
-          </button>
-          <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-            {plansFailed ? "Could not open your browser. Visit swattedw.tf/dashboard/plans." : "Opens in your browser."}
-          </p>
+          <div className="flex flex-col items-center px-6 py-8 text-center">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5">
+              <Receipt className="h-5 w-5 text-[var(--muted-foreground)]" aria-hidden="true" />
+            </span>
+            <h3 className="mt-4 text-sm font-semibold tracking-tight">No Active Orders</h3>
+            <p className="mt-1 max-w-md text-xs leading-relaxed text-[var(--muted-foreground)]">
+              Upgrade your plan to unlock more features, higher lookup limits, and priority support.
+            </p>
+            <button type="button" onClick={() => void openPlans()} className="btn-primary btn-compact mt-4">
+              View plans
+              <ExternalLink className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+            </button>
+            <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+              {plansFailed ? "Could not open your browser. Visit swattedw.tf/dashboard/plans." : "Opens in your browser."}
+            </p>
+          </div>
         </div>
       </div>
     </div>

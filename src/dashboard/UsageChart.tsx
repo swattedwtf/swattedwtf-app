@@ -12,7 +12,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
         {label}
       </p>
-      <p className="mt-1 text-lg font-semibold tracking-tight">{value}</p>
+      <p className="stat-value mt-1 text-lg font-semibold">{value}</p>
     </div>
   )
 }
@@ -32,50 +32,52 @@ export function UsageChart({ series }: { series: Point[] }) {
   const bw = data.length ? W / data.length : W
 
   return (
-    <div className="glass p-5">
-      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-        Usage (30d)
-      </p>
+    <div className="glass">
+      <div className="glass-body">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+          Usage (30d)
+        </p>
 
-      {data.length === 0 ? (
-        <p className="mt-6 text-xs text-[var(--muted-foreground)]">No activity yet.</p>
-      ) : (
-        <>
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            preserveAspectRatio="none"
-            role="img"
-            aria-label={`Daily lookups over the last ${data.length} days, peaking at ${peak}.`}
-            className="mt-4 h-32 w-full"
-          >
-            {/* Baseline, so an all-zero stretch still reads as a chart. */}
-            <rect x={0} y={H - 0.15} width={W} height={0.15} fill="rgba(255,255,255,0.12)" />
-            {data.map((d, i) => {
-              // A day with traffic never collapses to nothing: floor the bar at
-              // a visible sliver so one lookup is distinguishable from none.
-              const h = d.count > 0 ? Math.max(0.6, (d.count / max) * (H - 2)) : 0
-              return (
-                <rect
-                  key={d.date}
-                  x={i * bw + bw * 0.15}
-                  y={H - h}
-                  width={bw * 0.7}
-                  height={h}
-                  fill="rgba(255,255,255,0.32)"
-                >
-                  <title>{`${d.date}: ${d.count}`}</title>
-                </rect>
-              )
-            })}
-          </svg>
+        {data.length === 0 ? (
+          <p className="mt-6 text-xs text-[var(--muted-foreground)]">No activity yet.</p>
+        ) : (
+          <>
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`Daily lookups over the last ${data.length} days, peaking at ${peak}.`}
+              className="mt-4 h-32 w-full"
+            >
+              {/* Baseline, so an all-zero stretch still reads as a chart. */}
+              <rect x={0} y={H - 0.15} width={W} height={0.15} fill="rgba(255,255,255,0.12)" />
+              {data.map((d, i) => {
+                // A day with traffic never collapses to nothing: floor the bar at
+                // a visible sliver so one lookup is distinguishable from none.
+                const h = d.count > 0 ? Math.max(0.6, (d.count / max) * (H - 2)) : 0
+                return (
+                  <rect
+                    key={d.date}
+                    x={i * bw + bw * 0.15}
+                    y={H - h}
+                    width={bw * 0.7}
+                    height={h}
+                    fill="rgba(255,255,255,0.32)"
+                  >
+                    <title>{`${d.date}: ${d.count}`}</title>
+                  </rect>
+                )
+              })}
+            </svg>
 
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <Stat label="Window Total" value={formatCount(total)} />
-            <Stat label="Avg / Day" value={avg.toFixed(1)} />
-            <Stat label="Peak Day" value={formatCount(peak)} />
-          </div>
-        </>
-      )}
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <Stat label="Window Total" value={formatCount(total)} />
+              <Stat label="Avg / Day" value={avg.toFixed(1)} />
+              <Stat label="Peak Day" value={formatCount(peak)} />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
