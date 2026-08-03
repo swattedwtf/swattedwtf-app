@@ -41,3 +41,11 @@ sha2 = "0.10"
 ed25519-dalek = "2"
 hex = "0.4"
 
+
+# Debug builds of the full Tauri dependency tree carry several GB of debug
+# symbols, which is more than the build host has to spare. line-tables-only
+# keeps panic backtraces useful (file and line still resolve) while dropping
+# the variable-level DWARF that accounts for most of the size, and it links
+# noticeably faster too. Release builds are unaffected.
+[profile.dev]
+debug = "line-tables-only"
