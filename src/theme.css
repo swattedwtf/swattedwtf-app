@@ -16,6 +16,7 @@
   --positive: oklch(0.72 0.17 155);
   --warning: oklch(0.78 0.15 78);
   --border: oklch(0.18 0 0);
+  --input: oklch(0.18 0 0);
   --ring: oklch(0.7 0 0);
   --radius: 0.5rem;
 
@@ -34,6 +35,18 @@
   --color-card: var(--card);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  /* Every :root colour is mapped here, even the ones nothing uses yet. A
+     var(--color-x) with no mapping resolves to nothing rather than erroring, so
+     a missing entry shows up as a silently transparent element, which is
+     exactly how the login inputs lost their background once already. */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-positive: var(--positive);
