@@ -236,15 +236,15 @@ export function Walkthrough({ onDone }: { onDone: () => void }) {
     onDone()
   }, [onDone])
 
+  // Reads `step` from the closure rather than from a setState updater: finishing
+  // is a side effect, and React is free to run an updater more than once.
   const advance = useCallback(() => {
-    setStep((s) => {
-      if (s >= TOTAL - 1) {
-        finish()
-        return s
-      }
-      return nextStep(s, TOTAL)
-    })
-  }, [finish])
+    if (step >= TOTAL - 1) {
+      finish()
+      return
+    }
+    setStep((s) => nextStep(s, TOTAL))
+  }, [step, finish])
 
   const back = useCallback(() => setStep((s) => prevStep(s)), [])
 
