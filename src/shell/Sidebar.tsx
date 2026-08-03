@@ -90,7 +90,11 @@ export function Sidebar({
           `min-h-0` is what makes the scroll work: a flex child defaults to
           min-height:auto and would grow to fit all 30-odd rows, pushing the
           footer off the bottom of a short window instead of scrolling. */}
-      <div className="no-drag min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3 pt-1">
+      {/* The mask fades the last few pixels of the scroll area so a half-visible
+          row dissolves into the footer rule instead of being guillotined by it.
+          Purely cosmetic: where mask-image is unsupported the list simply
+          clips, exactly as it did before. */}
+      <div className="no-drag min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3 pt-1 [-webkit-mask-image:linear-gradient(to_bottom,#000_calc(100%-20px),transparent)] [mask-image:linear-gradient(to_bottom,#000_calc(100%-20px),transparent)]">
         {NAV.map((group) => {
           const key = `group:${group.label}`
           // Sections default to open, like the web dashboard.
