@@ -11,6 +11,7 @@ pub mod config;
 pub mod error;
 pub mod integrity;
 pub mod quick;
+pub mod window_chrome;
 pub mod session;
 pub mod updater;
 
@@ -67,9 +68,19 @@ pub fn run() {
             let client =
                 ApiClient::new(SessionStore::new(fallback)).expect("failed to build the API client");
 
+            // Rounded corners need the webview background cleared as well as
+            // the window being transparent; WebView2 paints its own background
+            // beneath the HTML and does not inherit the window's alpha.
+            if let Some(main) = app.get_webview_window("main") {
+                window_chrome::force_transparent(&main);
+            }
+
             // The overlay is built once, hidden, so the hotkey only has to
             // show it. Building on demand would cost a visible webview boot.
             let _ = quick::create(app.handle());
+            if let Some(overlay) = app.get_webview_window(quick::QUICK_LABEL) {
+                window_chrome::force_transparent(&overlay);
+            }
             register_quick_shortcut(app.handle());
 
             app.manage(AppState { client });

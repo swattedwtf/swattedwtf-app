@@ -32,6 +32,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .resizable(false)
         .decorations(false)
         .transparent(true)
+        .shadow(false)
         .always_on_top(true)
         // Absent from the taskbar and the alt-tab list: it is a transient
         // overlay, not a window you manage.
