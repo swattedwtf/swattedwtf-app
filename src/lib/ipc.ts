@@ -34,6 +34,16 @@ export type LoginOutcome =
 
 export type RegisterOutcome = { status: "ok"; code: string } | { status: "error"; message: string }
 
+export type WindowDiagnostics = {
+  decorated: boolean | null
+  maximized: boolean | null
+  scale_factor: number | null
+  background_error: string | null
+  layered: boolean | null
+  ex_style: string | null
+  platform: string
+}
+
 export const ipc = {
   verifyIntegrity: () => invoke<IntegrityReport>("verify_integrity"),
   checkUpdate: () => invoke<UpdateResult>("check_update"),
@@ -44,6 +54,7 @@ export const ipc = {
   saveRecoveryFile: (code: string) => invoke<string | null>("save_recovery_file", { code }),
   logout: () => invoke<void>("logout"),
   getOverview: () => invoke<Overview>("get_overview"),
+  windowDiagnostics: () => invoke<WindowDiagnostics>("window_diagnostics"),
   hideQuick: () => invoke<void>("hide_quick"),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
 }

@@ -94,6 +94,7 @@ pub fn run() {
             commands::install_update_and_restart,
             commands::open_external,
             commands::hide_quick,
+            commands::window_diagnostics,
             commands::save_recovery_file,
             commands::session_status,
             commands::login,

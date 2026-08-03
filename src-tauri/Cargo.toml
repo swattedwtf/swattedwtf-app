@@ -1,6 +1,6 @@
 [package]
 name = "swattedwtf-app"
-version = "0.1.6"
+version = "0.1.7"
 description = "Open-source desktop client for swatted.wtf"
 authors = ["swatted.wtf"]
 license = "MIT"
@@ -50,3 +50,8 @@ hex = "0.4"
 # noticeably faster too. Release builds are unaffected.
 [profile.dev]
 debug = "line-tables-only"
+
+# Windows-only: reading the extended window style for the transparency
+# diagnostic. Not used at runtime for anything else.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }

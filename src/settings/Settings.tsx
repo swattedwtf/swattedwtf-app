@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { getVersion } from "@tauri-apps/api/app"
 import type { IntegrityReport } from "../boot/machine"
-import { ipc, type Overview } from "../lib/ipc"
+import { ipc, type Overview, type WindowDiagnostics } from "../lib/ipc"
 import { messageOf } from "../lib/errors"
 import { formatSince } from "../lib/format"
 
@@ -41,6 +41,8 @@ export function Settings({
   onLoggedOut: () => void
 }) {
   const [version, setVersion] = useState("")
+  const [diag, setDiag] = useState<WindowDiagnostics | null>(null)
+  const [diagCopied, setDiagCopied] = useState(false)
   const [updateMsg, setUpdateMsg] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -161,6 +163,38 @@ export function Settings({
             Log out
           </button>
         </div>
+
+        {/* Transparency diagnostic. The rounded window corners render square on
+            some Windows machines despite the page being verifiably transparent,
+            so this reports what the window actually resolved to rather than
+            what it was asked for. */}
+        <div className="flex flex-wrap gap-2 pt-3">
+          <button
+            onClick={() => void ipc.windowDiagnostics().then(setDiag).catch(() => setDiag(null))}
+            className="btn-secondary btn-compact"
+          >
+            Window diagnostics
+          </button>
+          {diag && (
+            <button
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(JSON.stringify(diag, null, 2))
+                  .then(() => setDiagCopied(true))
+                  .catch(() => setDiagCopied(false))
+              }}
+              className="btn-secondary btn-compact"
+            >
+              {diagCopied ? "Copied" : "Copy"}
+            </button>
+          )}
+        </div>
+
+        {diag && (
+          <pre className="no-drag mt-2 max-h-40 select-text overflow-auto rounded-lg bg-black/40 p-3 font-mono text-[10px] leading-relaxed text-white/70">
+            {JSON.stringify(diag, null, 2)}
+          </pre>
+        )}
 
         {updateMsg && (
           <p className="pt-2 text-xs text-[var(--color-muted-foreground)]">{updateMsg}</p>

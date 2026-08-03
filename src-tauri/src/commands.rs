@@ -182,6 +182,21 @@ pub async fn hide_quick(app: AppHandle) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Reports what the window actually resolved to at runtime.
+///
+/// Exists because the rounded corners are configured correctly and verifiably
+/// transparent in the page, yet render square on Windows. Settings surfaces
+/// this so the machine with the problem can report the answer.
+#[tauri::command]
+pub async fn window_diagnostics(
+    app: AppHandle,
+) -> Result<crate::window_chrome::WindowDiagnostics, AppError> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| AppError::Internal("no main window".into()))?;
+    Ok(crate::window_chrome::diagnostics(&window))
+}
+
 /// Opens a URL in the user's browser.
 ///
 /// Allowlisted by ORIGIN, not by prefix: a bare `starts_with("https://github.com")`
