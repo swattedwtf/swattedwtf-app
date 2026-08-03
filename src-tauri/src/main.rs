@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    swatted_desktop_lib::run()
+    swattedwtf_app_lib::run()
 }
