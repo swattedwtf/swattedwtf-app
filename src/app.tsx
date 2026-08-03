@@ -1,8 +1,19 @@
-import { useEffect, useReducer } from "react"
+import { useCallback, useEffect, useReducer, useState } from "react"
 
 import { BootScreen } from "./boot/BootScreen"
-import { bootReducer, initialBootState } from "./boot/machine"
-import { ipc } from "./lib/ipc"
+import { OfflineScreen } from "./boot/OfflineScreen"
+import { RevealScreen } from "./boot/RevealScreen"
+import { TamperedScreen } from "./boot/TamperedScreen"
+import { UpdateReadyScreen } from "./boot/UpdateReadyScreen"
+import { bootReducer, initialBootState, type IntegrityReport } from "./boot/machine"
+import { CodeReveal } from "./auth/CodeReveal"
+import { LoginScreen } from "./auth/LoginScreen"
+import { RegisterScreen } from "./auth/RegisterScreen"
+import { TwoFactorScreen } from "./auth/TwoFactorScreen"
+import { Home } from "./dashboard/Home"
+import { Settings } from "./settings/Settings"
+import { Shell } from "./shell/Shell"
+import { ipc, type Overview } from "./lib/ipc"
 import "./theme.css"
 
 /** Minimum time the verifying stage stays on screen, so it never flashes. */
@@ -13,8 +24,14 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const messageOf = (err: unknown) =>
   typeof err === "string" ? err : err instanceof Error ? err.message : String(err)
 
+/** Which auth screen is showing. Local to the auth phase, not the boot machine. */
+type AuthView = { view: "login" } | { view: "twofa"; code: string } | { view: "register" }
+
 export default function App() {
   const [state, dispatch] = useReducer(bootReducer, initialBootState)
+  const [overview, setOverview] = useState<Overview | null>(null)
+  const [auth, setAuth] = useState<AuthView>({ view: "login" })
+  const [route, setRoute] = useState("/dashboard")
   const { phase } = state
 
   // Integrity check, held on screen for at least the dwell so the ring is seen.
@@ -61,23 +78,125 @@ export default function App() {
     }
   }, [phase])
 
-  if (phase === "verifying") return <BootScreen label="Verifying" />
-  if (phase === "updating") return <BootScreen label="Checking for updates" />
+  // The account payload the reveal and the whole shell are built from. Fetched
+  // on entering the reveal, which is also the first point at which the session
+  // is proven good server-side: a locally stored cookie can still be expired,
+  // and a 401 here correctly sends the user back to the login screen.
+  useEffect(() => {
+    if (phase !== "reveal" || overview) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const data = await ipc.getOverview()
+        if (!cancelled) setOverview(data)
+      } catch (err) {
+        if (cancelled) return
+        const message = messageOf(err)
+        if (message.includes("401") || message.toLowerCase().includes("not authenticated")) {
+          dispatch({ type: "logged_out" })
+        } else {
+          dispatch({ type: "network_error", message })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [phase, overview])
 
-  // TEMPORARY: tampered, update_ready, offline, auth, reveal and ready get their
-  // real screens in Tasks 9, 10, 14 and 15. Until then the phase is rendered as
-  // plain text so the boot sequence stays observable instead of crashing.
-  return (
-    <div className="drag flex h-full flex-col items-center justify-center gap-3 bg-[#0b0b0b] px-8 text-center">
-      <p className="text-[34px] font-medium tracking-[-0.02em] text-[var(--mark-fg)]">
-        swatted<span className="text-[var(--mark-tld)]">.wtf</span>
-      </p>
-      <p className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-        placeholder screen: {phase}
-      </p>
-      {state.error ? (
-        <p className="max-w-[400px] text-[12px] text-[var(--muted-foreground)]">{state.error}</p>
-      ) : null}
-    </div>
-  )
+  const handleAuthenticated = useCallback(() => {
+    // Drop any stale payload so the reveal fetches for the account that just
+    // signed in rather than greeting the previous one.
+    setOverview(null)
+    setAuth({ view: "login" })
+    dispatch({ type: "authenticated" })
+  }, [])
+
+  const handleLoggedOut = useCallback(() => {
+    setOverview(null)
+    setRoute("/dashboard")
+    setAuth({ view: "login" })
+    dispatch({ type: "logged_out" })
+  }, [])
+
+  switch (phase) {
+    case "verifying":
+      return <BootScreen label="Verifying" />
+
+    case "updating":
+      return <BootScreen label="Checking for updates" />
+
+    case "tampered":
+      return (
+        <TamperedScreen
+          changedFiles={state.changedFiles}
+          onContinue={() => dispatch({ type: "ignore_tamper" })}
+        />
+      )
+
+    case "update_ready":
+      return (
+        <UpdateReadyScreen
+          version={state.updateVersion}
+          onLater={() => dispatch({ type: "defer_update" })}
+        />
+      )
+
+    case "offline":
+      return <OfflineScreen error={state.error} onRetry={() => dispatch({ type: "retry" })} />
+
+    case "auth":
+      if (auth.view === "register") {
+        return (
+          <RegisterScreen
+            onAuthenticated={handleAuthenticated}
+            onBack={() => setAuth({ view: "login" })}
+          />
+        )
+      }
+      if (auth.view === "twofa") {
+        return (
+          <TwoFactorScreen
+            code={auth.code}
+            onAuthenticated={handleAuthenticated}
+            onCancel={() => setAuth({ view: "login" })}
+          />
+        )
+      }
+      return (
+        <LoginScreen
+          onAuthenticated={handleAuthenticated}
+          onRegister={() => setAuth({ view: "register" })}
+          onTwoFactor={(code) => setAuth({ view: "twofa", code })}
+        />
+      )
+
+    case "reveal":
+      // Black while the payload lands. The previous screen is black too, so the
+      // gap reads as part of the reveal rather than as a pause.
+      if (!overview) return <div className="drag h-full bg-[#0b0b0b]" />
+      return <RevealScreen overview={overview} onDone={() => dispatch({ type: "reveal_done" })} />
+
+    case "ready": {
+      if (!overview) return <div className="drag h-full bg-[#0b0b0b]" />
+      const integrity: IntegrityReport = {
+        ok: state.integrityOk,
+        changed: state.changedFiles,
+        manifest_version: "",
+      }
+      return (
+        <Shell route={route} onNavigate={setRoute}>
+          {route === "/settings" ? (
+            <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
+          ) : (
+            <Home overview={overview} />
+          )}
+        </Shell>
+      )
+    }
+  }
 }
+
+// Re-exported so the one-time code reveal stays reachable from the auth flow
+// even though App renders it via RegisterScreen.
+export { CodeReveal }
