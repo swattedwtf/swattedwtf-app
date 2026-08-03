@@ -189,4 +189,18 @@ manifest is not the one CI signed. Both of those are expected.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Fork it, read it, build it, ship your own changes.
+
+### Name and branding
+
+The MIT licence covers the **code**. It does not grant any right to the
+swatted.wtf name, wordmark or logo.
+
+If you distribute a modified build, please rename it. That is not about
+control, it is so that a user who downloads something calling itself
+swatted.wtf can tell where it came from. A redistributed build carrying this
+name is exactly what the integrity check is meant to flag, and that check is a
+hint rather than a guarantee, since a hostile fork would simply remove it.
+
+Official builds come only from
+[the releases page](https://github.com/sujrb/swattedwtf-app/releases).
