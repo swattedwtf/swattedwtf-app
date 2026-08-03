@@ -75,7 +75,14 @@ jobs:
       # bytes before anything is published. They sign the same payload in two
       # languages, so a mismatch would otherwise ship as a spurious "this copy
       # has been modified" screen on every launch.
+      # Linux only. This compiles the whole crate in DEBUG just to run one
+      # test, and tauri-action then compiles it again in release, so paying it
+      # twice per release bought nothing: the property under test is that the JS
+      # generator and the Rust verifier agree on the canonical signed bytes,
+      # which is byte arithmetic with no OS-specific behaviour. Running it on
+      # the Linux job still fails the release before anything is published.
       - name: Verify the manifest against the Rust verifier
+        if: matrix.platform == 'ubuntu-22.04'
         shell: bash
         working-directory: src-tauri
         env:
