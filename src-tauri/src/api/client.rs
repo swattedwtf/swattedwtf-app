@@ -1,9 +1,15 @@
 //! Shared HTTP client.
 //!
-//! Sends no Origin and no Referer, which is what lib/security.ts's
-//! sameOriginOrAllowed permits for non-browser callers (it falls through to
-//! allow when both headers are absent). Adding either would get requests
-//! rejected as cross-origin.
+//! Every state-changing request carries an explicit `Origin` matching the API
+//! base. sameOriginOrAllowed in lib/security.ts rejects a production POST that
+//! has neither Origin nor Referer with "Browser origin is required.", so
+//! omitting it made login and registration fail with a 403 before the server
+//! ever looked at the credentials.
+//!
+//! Setting it weakens nothing. That guard exists to stop a browser being driven
+//! into a cross-site POST by another page; a native client is outside that
+//! threat model and can set any header it likes regardless, so sending the
+//! honest value is both correct and the only thing that works.
 
 use crate::config::api_base;
 use crate::error::AppError;
@@ -37,6 +43,11 @@ impl ApiClient {
 
     fn url(&self, path: &str) -> String {
         format!("{}{}", api_base(), path)
+    }
+
+    /// The Origin the server expects on state-changing requests.
+    fn origin() -> &'static str {
+        api_base()
     }
 
     /// True when a session cookie is present in the jar. Does not prove the
@@ -111,6 +122,7 @@ impl ApiClient {
         let resp = self
             .http
             .post(self.url(path))
+            .header(reqwest::header::ORIGIN, Self::origin())
             .json(body)
             .send()
             .await
@@ -132,6 +144,7 @@ impl ApiClient {
         let resp = self
             .http
             .post(self.url(path))
+            .header(reqwest::header::ORIGIN, Self::origin())
             .json(body)
             .send()
             .await
@@ -167,5 +180,15 @@ mod tests {
     #[test]
     fn the_default_api_base_is_production_over_https() {
         assert_eq!(api_base(), "https://swattedw.tf");
+    }
+
+    /// Regression guard. Without an Origin, lib/security.ts answers a production
+    /// POST with 403 "Browser origin is required." and login never reaches the
+    /// credential check at all.
+    #[test]
+    fn the_origin_header_matches_the_api_base_exactly() {
+        assert_eq!(ApiClient::origin(), api_base());
+        assert!(ApiClient::origin().starts_with("https://"));
+        assert!(!ApiClient::origin().ends_with('/'), "a trailing slash would not match the server's expected origin");
     }
 }
