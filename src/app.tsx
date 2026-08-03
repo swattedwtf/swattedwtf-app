@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useReducer, useState } from "react"
 
-import { BootScreen } from "./boot/BootScreen"
+import { BootStage } from "./boot/BootStage"
 import { OfflineScreen } from "./boot/OfflineScreen"
-import { RevealScreen } from "./boot/RevealScreen"
 import { TamperedScreen } from "./boot/TamperedScreen"
 import { UpdateReadyScreen } from "./boot/UpdateReadyScreen"
 import { bootReducer, initialBootState, type IntegrityReport } from "./boot/machine"
@@ -136,10 +135,10 @@ export default function App() {
   const screen = (() => {
   switch (phase) {
     case "verifying":
-      return <BootScreen label="Verifying" />
+      return <BootStage mode="loading" label="Verifying" />
 
     case "updating":
-      return <BootScreen label="Checking for updates" />
+      return <BootStage mode="loading" label="Checking for updates" />
 
     case "tampered":
       return (
@@ -188,13 +187,20 @@ export default function App() {
 
     case "reveal":
       // The fetch is bounded by a 30s HTTP timeout, and a featureless black
-      // window for that long is indistinguishable from a hang, so keep the ring
-      // on screen rather than showing nothing.
-      if (!overview) return <BootScreen label="Loading your account" />
-      return <RevealScreen overview={overview} onDone={() => dispatch({ type: "reveal_done" })} />
+      // window for that long is indistinguishable from a hang, so the ring
+      // stays up with a label rather than showing nothing. Same component
+      // either way, so the mark never leaves the screen.
+      if (!overview) return <BootStage mode="loading" label="Loading your account" />
+      return (
+        <BootStage
+          mode="reveal"
+          overview={overview}
+          onRevealDone={() => dispatch({ type: "reveal_done" })}
+        />
+      )
 
     case "ready": {
-      if (!overview) return <BootScreen label="Loading your account" />
+      if (!overview) return <BootStage mode="loading" label="Loading your account" />
       const integrity: IntegrityReport = {
         ok: state.integrityOk,
         changed: state.changedFiles,

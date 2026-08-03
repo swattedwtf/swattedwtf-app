@@ -1,0 +1,246 @@
+/* Boot stage.
+ *
+ * Lives here rather than in theme.css so the sequence's timing can be reasoned
+ * about in one place, next to the component that drives it.
+ *
+ * The whole point of this file is continuity. The sequence used to be three
+ * separate components that hard-swapped: the ring cut out the instant the phase
+ * changed, and the wordmark did not begin fading in for another 250ms, so the
+ * signature moment of the product opened with a quarter second of empty black.
+ * Here the mark is ONE element that never unmounts. It scales up as the ring
+ * retires, so verify, update and reveal read as a single gesture.
+ */
+
+.stage {
+  --mark-scale: 1;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: #0b0b0b;
+  transition: opacity 220ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Fades just before handing over to the shell, so the dashboard does not
+   replace a black screen in a single frame. */
+.stage[data-leaving="true"] {
+  opacity: 0;
+}
+
+/* A pool of light so the black has depth. The middle stop sits wide and the
+   grain sits on top: a two-stop radial over near-black bands visibly at 8-bit,
+   and the texture breaks the rings up. */
+.stage-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 460px;
+  height: 460px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.022) 52%,
+    transparent 72%
+  );
+}
+
+.stage-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("/bg/texture.png");
+  background-size: 180px;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+}
+
+.stage-inner {
+  position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- The mark ----------------------------------------------------------
+   One element for the entire sequence. Scale rather than font-size so the
+   browser can composite it on the GPU instead of relaying out text. */
+.stage-mark {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--mark-fg);
+  transform: scale(var(--mark-scale));
+  transform-origin: center;
+  transition: transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+  animation: stageMarkIn 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes stageMarkIn {
+  from {
+    opacity: 0;
+    transform: scale(calc(var(--mark-scale) * 0.94));
+  }
+  to {
+    opacity: 1;
+    transform: scale(var(--mark-scale));
+  }
+}
+
+.stage[data-mode="reveal"] {
+  /* 19px to 34px, the size the reveal used to hard-cut to. */
+  --mark-scale: 1.79;
+}
+
+/* ---- The ring ----------------------------------------------------------
+   Rotates LINEAR. An eased rotation loop makes the arc visibly stall once per
+   revolution, which reads as a stutter rather than as motion. Indeterminate
+   spinners ease the dash, never the rotation. */
+.stage-ring {
+  height: 66px;
+  margin-top: 34px;
+  overflow: hidden;
+  transition:
+    opacity 200ms cubic-bezier(0.4, 0, 1, 1),
+    transform 200ms cubic-bezier(0.4, 0, 1, 1),
+    height 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    margin-top 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Collapses its box as well as fading. Fading alone left the ring's 100px of
+   layout behind as a dead gap between the mark and the rule, which pushed the
+   whole group off centre. */
+.stage[data-mode="reveal"] .stage-ring {
+  opacity: 0;
+  transform: scale(0.88);
+  height: 0;
+  margin-top: 0;
+}
+
+.stage-ring-arc {
+  transform-origin: 50% 50%;
+  animation: stageSpin 1.05s linear infinite;
+}
+
+.stage-ring-arc-inner {
+  transform-origin: 50% 50%;
+  animation: stageSpinBack 2.4s linear infinite;
+}
+
+@keyframes stageSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes stageSpinBack {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* ---- Labels and the reveal --------------------------------------------- */
+.stage-label {
+  margin-top: 26px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.55);
+  /* Breathes rather than sweeping a gradient: the old shimmer wrapped its
+     background position and the seam was visible on every loop. */
+  animation: stageBreathe 1.9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  transition: opacity 180ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes stageBreathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.stage[data-mode="reveal"] .stage-label {
+  opacity: 0;
+  animation: none;
+}
+
+/* The rule and the welcome only exist in the reveal, so they animate in from
+   nothing. Delays are measured from the moment the mark starts growing. */
+.stage-rule {
+  margin-top: 18px;
+  height: 1px;
+  width: 0;
+  /* Fades into the black at both ends instead of stopping dead. */
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.28) 20%,
+    rgba(255, 255, 255, 0.28) 80%,
+    transparent
+  );
+  animation: stageRule 620ms cubic-bezier(0.16, 1, 0.3, 1) 300ms forwards;
+}
+
+@keyframes stageRule {
+  to {
+    width: 168px;
+  }
+}
+
+.stage-welcome {
+  margin-top: 20px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: stageUp 560ms cubic-bezier(0.16, 1, 0.3, 1) 620ms forwards;
+}
+
+.stage-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: stageUp 560ms cubic-bezier(0.16, 1, 0.3, 1) 980ms forwards;
+}
+
+@keyframes stageUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Reduced motion: the sequence still happens, it just stops moving. Content is
+   never missing, which is what the previous blanket rule got wrong. */
+@media (prefers-reduced-motion: reduce) {
+  .stage-mark,
+  .stage-rule,
+  .stage-welcome,
+  .stage-hint {
+    animation-duration: 0.12s !important;
+    animation-delay: 0s !important;
+  }
+
+  .stage-mark {
+    transition: none;
+  }
+
+  .stage-ring-arc,
+  .stage-ring-arc-inner,
+  .stage-label {
+    animation: none !important;
+  }
+
+  .stage-label {
+    opacity: 0.85;
+  }
+}
