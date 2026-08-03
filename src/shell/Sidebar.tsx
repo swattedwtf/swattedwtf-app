@@ -76,17 +76,21 @@ export function Sidebar({
   }, [])
 
   return (
-    <nav className="relative z-10 flex h-full w-[224px] shrink-0 flex-col overflow-y-auto border-r border-white/[0.07] bg-black/40 pb-3 backdrop-blur-xl">
+    <nav className="relative z-10 flex h-full w-[224px] shrink-0 flex-col overflow-hidden border-r border-white/[0.07] bg-black/40 backdrop-blur-xl">
       <div
         data-tauri-drag-region
-        className="drag mb-1 border-b border-white/[0.06] px-5 pb-3.5 pt-4 text-[15px] font-semibold tracking-[-0.01em]"
+        className="drag shrink-0 border-b border-white/[0.06] px-4 pb-3.5 pt-4 text-[15px] font-semibold tracking-[-0.01em]"
       >
         swatted<span className="text-[var(--mark-tld)]">.wtf</span>
       </div>
 
       {/* Everything below the header is interactive chrome, so it opts out of
-          the window drag region wholesale rather than row by row. */}
-      <div className="no-drag flex min-h-0 flex-1 flex-col px-2.5">
+          the window drag region wholesale rather than row by row.
+
+          `min-h-0` is what makes the scroll work: a flex child defaults to
+          min-height:auto and would grow to fit all 30-odd rows, pushing the
+          footer off the bottom of a short window instead of scrolling. */}
+      <div className="no-drag min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3 pt-1">
         {NAV.map((group) => {
           const key = `group:${group.label}`
           // Sections default to open, like the web dashboard.
@@ -97,7 +101,7 @@ export function Sidebar({
                 type="button"
                 onClick={() => toggle(key, open)}
                 aria-expanded={open}
-                className="group flex w-full items-center gap-1.5 px-2.5 pb-1 pt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-white/70"
+                className="group flex w-full items-center gap-1.5 px-2 pb-1 pt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-white/70"
               >
                 <ChevronDown
                   className={`h-3 w-3 shrink-0 transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
@@ -129,11 +133,13 @@ export function Sidebar({
             </div>
           )
         })}
+      </div>
 
-        <div className="mt-auto border-t border-[var(--color-border)] pt-2">
-          <Row item={{ label: "Plans", href: "/plans" }} route={route} onNavigate={onNavigate} />
-          <Row item={{ label: "Settings", href: "/settings" }} route={route} onNavigate={onNavigate} />
-        </div>
+      {/* Pinned, outside the scroll area: Settings is the other half of what
+          actually works in v1 and must never scroll out of reach. */}
+      <div className="no-drag shrink-0 border-t border-[var(--color-border)] px-2 pb-3 pt-2">
+        <Row item={{ label: "Plans", href: "/plans" }} route={route} onNavigate={onNavigate} />
+        <Row item={{ label: "Settings", href: "/settings" }} route={route} onNavigate={onNavigate} />
       </div>
     </nav>
   )
@@ -184,7 +190,7 @@ function PlatformGroup({
         onClick={() => toggle(key, open)}
         aria-expanded={open}
         title="Coming in a future update"
-        className="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-white/55 opacity-45 transition-colors hover:bg-white/[0.05] hover:opacity-70"
+        className="group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] text-white/55 opacity-45 transition-colors hover:bg-white/[0.05] hover:opacity-70"
       >
         <NavIcon href={item.href} brand className="h-4 w-4 shrink-0" />
         <span className="truncate">{item.label}</span>
@@ -231,9 +237,12 @@ function Row({
   nested?: boolean
   brand?: boolean
 }) {
-  // Children sit under a 16px icon plus a 10px gap, so 34px of leading space
-  // lines their labels up under the parent's label rather than its icon.
-  const pad = nested ? "pl-[34px] pr-2.5" : "px-2.5"
+  // Children are indented 14px from their parent. The web dashboard indents a
+  // full 36px so child labels line up under the parent's label, but this
+  // sidebar is a fixed 224px and that much indent left "Share Resolver" with
+  // roughly 85px of label, i.e. permanently ellipsised. 14px still reads as a
+  // clear step down while keeping every child label whole.
+  const pad = nested ? "pl-[22px] pr-2" : "px-2"
 
   if (item.external) {
     return (

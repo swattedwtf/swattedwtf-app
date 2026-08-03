@@ -3,9 +3,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Command,
   Download,
   KeyRound,
+  Keyboard,
   LayoutGrid,
   Search,
   ShieldCheck,
@@ -87,7 +87,9 @@ type Step = {
 
 const STEPS: Step[] = [
   {
-    icon: Command,
+    // Deliberately not the Command glyph: this is a Windows app and the
+    // hotkey has no Command key in it.
+    icon: Keyboard,
     title: "One hotkey, from anywhere",
     body:
       "Press Ctrl, Shift and Space together, in any window in Windows, and a lookup bar opens over whatever you were doing. Paste an ID, an email, a phone number, a domain or a username, press Enter, and the matching lookup opens. This is the reason the app exists: the website cannot reach you while you are in another program.",

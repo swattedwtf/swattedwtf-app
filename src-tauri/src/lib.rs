@@ -68,6 +68,9 @@ pub fn run() {
             let client =
                 ApiClient::new(SessionStore::new(fallback)).expect("failed to build the API client");
 
+            app.manage(AppState { client });
+            app.manage(updater::PendingUpdate::default());
+
             // Rounded corners need the webview background cleared as well as
             // the window being transparent; WebView2 paints its own background
             // beneath the HTML and does not inherit the window's alpha.
@@ -83,8 +86,6 @@ pub fn run() {
             }
             register_quick_shortcut(app.handle());
 
-            app.manage(AppState { client });
-            app.manage(updater::PendingUpdate::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -100,6 +101,19 @@ pub fn run() {
             commands::logout,
             commands::get_overview,
         ])
+        // Closing the main window must end the process.
+        //
+        // Tauri exits when the window map empties, and the quick-lookup overlay
+        // is created hidden at startup and only ever hidden again, never
+        // closed. Without this, clicking X destroyed `main` while `quick` kept
+        // the map non-empty, leaving a process with no taskbar entry, no tray
+        // icon, no way back to a window, and the global hotkey still grabbed:
+        // killable only from Task Manager.
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                window.app_handle().exit(0);
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
