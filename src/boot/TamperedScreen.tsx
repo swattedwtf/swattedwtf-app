@@ -48,13 +48,13 @@ export function TamperedScreen({
       <div className="no-drag flex gap-2">
         <button
           onClick={() => void ipc.openExternal(RELEASES_URL).catch(() => {})}
-          className="h-10 rounded-lg bg-white px-5 font-medium text-black"
+          className="btn-primary"
         >
           Download the official build
         </button>
         <button
           onClick={onContinue}
-          className="h-10 rounded-lg border border-[var(--color-border)] px-5 text-sm text-[var(--color-muted-foreground)] hover:text-white"
+          className="btn-secondary"
         >
           Continue anyway
         </button>

@@ -285,7 +285,7 @@ export function Walkthrough({ onDone }: { onDone: () => void }) {
   const isLast = step === TOTAL - 1
 
   const ghostButton =
-    "no-drag flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] px-4 text-[13px] text-white/70 transition-colors hover:border-white/30 hover:text-white disabled:pointer-events-none disabled:opacity-25"
+    "no-drag btn-secondary btn-compact gap-2 disabled:pointer-events-none"
 
   return (
     <div
@@ -381,7 +381,7 @@ export function Walkthrough({ onDone }: { onDone: () => void }) {
           <button
             type="button"
             onClick={advance}
-            className="no-drag flex h-9 items-center gap-2 rounded-lg bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90"
+            className="no-drag btn-primary btn-compact gap-2"
           >
             {isLast ? "Open the dashboard" : "Next"}
             {isLast ? (

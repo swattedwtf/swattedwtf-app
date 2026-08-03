@@ -73,14 +73,14 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
         <button
           type="button"
           onClick={() => void copy()}
-          className="h-9 rounded-lg border border-[var(--color-border)] px-4 text-sm transition-colors hover:border-white/40"
+          className="btn-secondary btn-compact"
         >
           {copied ? "Copied" : "Copy"}
         </button>
         <button
           type="button"
           onClick={() => void saveToFile()}
-          className="h-9 rounded-lg border border-[var(--color-border)] px-4 text-sm transition-colors hover:border-white/40"
+          className="btn-secondary btn-compact"
         >
           Save recovery file...
         </button>
@@ -110,7 +110,7 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
         type="button"
         disabled={!saved}
         onClick={onContinue}
-        className="no-drag h-10 w-[220px] rounded-lg bg-white font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
+        className="no-drag btn-primary w-[220px]"
       >
         Continue
       </button>

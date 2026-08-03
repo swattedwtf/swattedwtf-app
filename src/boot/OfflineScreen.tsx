@@ -23,7 +23,7 @@ export function OfflineScreen({ error, onRetry }: { error: string | null; onRetr
 
       <button
         onClick={onRetry}
-        className="no-drag h-10 rounded-lg bg-white px-6 font-medium text-black"
+        className="no-drag btn-primary"
       >
         Retry
       </button>

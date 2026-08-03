@@ -51,14 +51,14 @@ export function UpdateReadyScreen({
         <button
           onClick={restart}
           disabled={busy}
-          className="h-10 rounded-lg bg-white px-5 font-medium text-black disabled:opacity-40"
+          className="btn-primary"
         >
           {busy ? "Restarting..." : "Restart now"}
         </button>
         <button
           onClick={onLater}
           disabled={busy}
-          className="h-10 rounded-lg border border-[var(--color-border)] px-5 text-sm text-[var(--color-muted-foreground)] hover:text-white disabled:opacity-40"
+          className="btn-secondary"
         >
           Later
         </button>
