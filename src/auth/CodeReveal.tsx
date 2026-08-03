@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react"
-import { save } from "@tauri-apps/plugin-dialog"
-import { writeTextFile } from "@tauri-apps/plugin-fs"
 
+import { ipc } from "../lib/ipc"
 import { formatLoginCode } from "./code"
 
 /** How long the "Copied" confirmation stays on the copy button. */
 const COPIED_MS = 1600
 
-const RECOVERY_FILENAME = "swatted-login-code.txt"
 
 /**
  * Shown exactly once, right after registration. The code is the ONLY way back
@@ -45,17 +43,12 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
   async function saveToFile() {
     setError("")
     try {
-      const path = await save({
-        defaultPath: RECOVERY_FILENAME,
-        filters: [{ name: "Text", extensions: ["txt"] }],
-      })
+      // The dialog and the write both happen in Rust. The webview is granted no
+      // filesystem permission at all, so the only path ever written is the one
+      // the user picked in a native save dialog.
+      const path = await ipc.saveRecoveryFile(formatLoginCode(code))
       // Null means the user cancelled the dialog. Nothing is written.
-      if (!path) return
-      await writeTextFile(
-        path,
-        `swatted.wtf login code\n\n${formatLoginCode(code)}\n\nThis code is the only way to sign in. Keep it private.\n`,
-      )
-      setSavedTo(path)
+      if (path) setSavedTo(path)
     } catch (err) {
       setError(messageOf(err))
     }

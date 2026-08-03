@@ -46,6 +46,7 @@ pub fn run() {
             commands::check_update,
             commands::install_update_and_restart,
             commands::open_external,
+            commands::save_recovery_file,
             commands::session_status,
             commands::login,
             commands::register,

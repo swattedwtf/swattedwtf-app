@@ -98,6 +98,51 @@ pub fn install_update_and_restart(app: AppHandle) -> Result<(), AppError> {
     crate::updater::install_and_restart(&app)
 }
 
+/// Writes the one-time login code to a file the user picks.
+///
+/// Deliberately implemented in Rust rather than with the fs plugin in the
+/// webview. Granting the UI filesystem access to save one small file would mean
+/// any script running in the webview could write anywhere the scope allowed;
+/// here the only path ever written is the one the user chose in a native save
+/// dialog, and the UI has no fs permission at all.
+///
+/// Returns the chosen path, or None when the user cancels.
+#[tauri::command]
+pub async fn save_recovery_file(app: AppHandle, code: String) -> Result<Option<String>, AppError> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_file_name("swatted-login-code.txt")
+        .add_filter("Text", &["txt"])
+        .save_file(move |path| {
+            let _ = tx.send(path);
+        });
+
+    let Some(path) = rx.await.map_err(|_| AppError::Internal("dialog closed".into()))? else {
+        return Ok(None);
+    };
+
+    let path = path
+        .into_path()
+        .map_err(|e| AppError::Internal(format!("invalid save path: {e}")))?;
+
+    let body = format!(
+        "swatted.wtf login code\n\n{code}\n\nThis code is the only way to sign in. Keep it private.\n"
+    );
+    std::fs::write(&path, body).map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Owner-only where the platform supports it: this file holds a credential.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 /// Opens a URL in the user's browser.
 ///
 /// Allowlisted by ORIGIN, not by prefix: a bare `starts_with("https://github.com")`

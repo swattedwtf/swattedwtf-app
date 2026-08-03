@@ -41,6 +41,7 @@ export const ipc = {
   sessionStatus: () => invoke<{ authenticated: boolean }>("session_status"),
   login: (code: string, otp?: string) => invoke<LoginOutcome>("login", { code, otp }),
   register: (email?: string) => invoke<RegisterOutcome>("register", { email }),
+  saveRecoveryFile: (code: string) => invoke<string | null>("save_recovery_file", { code }),
   logout: () => invoke<void>("logout"),
   getOverview: () => invoke<Overview>("get_overview"),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
