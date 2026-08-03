@@ -9,8 +9,9 @@ pub mod captcha;
 pub mod commands;
 pub mod config;
 pub mod error;
-mod integrity;
+pub mod integrity;
 pub mod session;
+pub mod updater;
 
 use api::client::ApiClient;
 use commands::AppState;
@@ -20,6 +21,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -36,11 +38,14 @@ pub fn run() {
                 ApiClient::new(SessionStore::new(fallback)).expect("failed to build the API client");
 
             app.manage(AppState { client });
+            app.manage(updater::PendingUpdate::default());
             Ok(())
         })
-        // Only the commands that exist so far. verify_integrity, the updater
-        // pair and open_external are added by their own tasks.
         .invoke_handler(tauri::generate_handler![
+            commands::verify_integrity,
+            commands::check_update,
+            commands::install_update_and_restart,
+            commands::open_external,
             commands::session_status,
             commands::login,
             commands::register,

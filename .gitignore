@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build output: a stale committed manifest would make every dev build report tampering.
+src-tauri/resources/
