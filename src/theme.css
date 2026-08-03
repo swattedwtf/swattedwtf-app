@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+:root {
+  /* Palette: pure black & white, neutral grays only. Ported from Parallax. */
+  --background: oklch(0.04 0 0);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.08 0 0);
+  --popover: oklch(0.08 0 0);
+  --primary: oklch(1 0 0);
+  --primary-foreground: oklch(0.04 0 0);
+  --secondary: oklch(0.14 0 0);
+  --muted: oklch(0.14 0 0);
+  --muted-foreground: oklch(0.62 0 0);
+  --accent: oklch(0.14 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --positive: oklch(0.72 0.17 155);
+  --warning: oklch(0.78 0.15 78);
+  --border: oklch(0.18 0 0);
+  --ring: oklch(0.7 0 0);
+  --radius: 0.5rem;
+
+  /* Brand mark. Measured from the 640x640 master. */
+  --mark-fg: #ffffff;
+  --mark-tld: #404040;
+
+  /* Liquid glass. */
+  --glass-filter: blur(22px) saturate(1.8) brightness(1.06) contrast(1.03);
+  --glass-edge: oklch(1 0 0 / 0.2);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-positive: var(--positive);
+  --color-warning: var(--warning);
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --radius-lg: var(--radius);
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  /* The window is frameless; nothing should ever scroll the shell itself. */
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Glass panel, matching the dashboard's card treatment. */
+.glass {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top-color: var(--glass-edge);
+  border-radius: 1rem;
+  backdrop-filter: var(--glass-filter);
+  box-shadow: 0 1px 0 0 oklch(1 0 0 / 0.06) inset, 0 8px 30px -12px oklch(0 0 0 / 0.8);
+}
+
+/* WebKitGTK on some distros lacks backdrop-filter; fall back to a flat card. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: oklch(0.09 0 0); }
+}
+
+/* Frameless drag regions. Interactive children must set -webkit-app-region: no-drag. */
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "swatted-desktop",
+  "productName": "Swatted.wtf",
   "version": "0.1.0",
   "identifier": "tf.swattedw.desktop",
   "build": {
@@ -12,24 +12,27 @@
   "app": {
     "windows": [
       {
-        "title": "swatted-desktop",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "Swatted.wtf",
+        "width": 520,
+        "height": 620,
+        "resizable": false,
+        "decorations": false,
+        "transparent": false,
+        "center": true,
+        "backgroundColor": "#0b0b0b"
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost"
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
+    "targets": ["msi", "nsis", "deb", "appimage"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico", "icons/icon.png"],
+    "publisher": "swatted.wtf",
+    "shortDescription": "Open-source desktop client for swatted.wtf",
+    "longDescription": "Open-source desktop client for the swatted.wtf OSINT platform."
   }
 }
