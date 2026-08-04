@@ -58,6 +58,38 @@ export type LookupResult = {
   partial: string[]
 }
 
+/**
+ * The desktop-only preferences, plus what the operating system actually did
+ * with them.
+ *
+ * `shortcut` and `shortcutActive` are separate on purpose. The first is what the
+ * user chose and what is stored; the second is what is bound right now. They
+ * differ whenever registration failed, and a screen that showed only the first
+ * would be telling the user a hotkey works when it does not.
+ */
+export type SettingsView = {
+  shortcut: string | null
+  shortcutActive: string | null
+  shortcutError: string | null
+  /** Read from the OS, not from our settings file, which does not store it. */
+  launchAtLogin: boolean
+  /** Set when we could not tell, which is not the same as "off". */
+  launchAtLoginError: string | null
+  appDataDir: string
+}
+
+/**
+ * What came of a rebind request. Describes reality rather than the request:
+ * `active` is the combo that is live afterwards, which on a failure is the one
+ * the user had before.
+ */
+export type ShortcutOutcome = {
+  applied: boolean
+  active: string | null
+  /** The operating system's own message, shown verbatim. */
+  error: string | null
+}
+
 export type LoginOutcome =
   | { status: "ok" }
   | { status: "twofa_required"; message: string }
@@ -89,6 +121,19 @@ export const ipc = {
   windowDiagnostics: () => invoke<WindowDiagnostics>("window_diagnostics"),
   hideQuick: () => invoke<void>("hide_quick"),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
+
+  getSettings: () => invoke<SettingsView>("get_settings"),
+
+  /**
+   * Changes the global hotkey. `null` turns it off.
+   *
+   * Resolves even when the combo was refused: the outcome says which binding is
+   * live, so a rejected request never leaves the screen guessing.
+   */
+  setShortcut: (shortcut: string | null) => invoke<ShortcutOutcome>("set_shortcut", { shortcut }),
+
+  /** Returns what the OS reports afterwards, not what was asked for. */
+  setLaunchAtLogin: (enabled: boolean) => invoke<boolean>("set_launch_at_login", { enabled }),
 
   /**
    * Runs one lookup module. `module` is a key into a static table on the

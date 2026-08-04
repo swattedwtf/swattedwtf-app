@@ -7,6 +7,8 @@
 use crate::api::{auth, client::ApiClient, lookup as lookup_api, overview};
 use crate::captcha;
 use crate::error::AppError;
+use crate::settings::SettingsState;
+use crate::shortcut::{self, ShortcutOutcome};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
@@ -83,6 +85,97 @@ pub async fn lookup(
 #[tauri::command]
 pub async fn fetch_image(state: State<'_, AppState>, url: String) -> Result<String, AppError> {
     lookup_api::fetch_image(&state.client, &url).await
+}
+
+/// Everything the Settings screen needs that is not already in the overview.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsView {
+    /// The combo the user chose, or null when they turned the hotkey off.
+    pub shortcut: Option<String>,
+    /// What the operating system has bound RIGHT NOW. Not the same thing as
+    /// `shortcut`: a combo another application already holds is stored and not
+    /// live, and the screen must not claim otherwise.
+    pub shortcut_active: Option<String>,
+    /// The system's own message when the two differ.
+    pub shortcut_error: Option<String>,
+    /// Read from the operating system rather than from settings.json. The OS
+    /// owns this bit, the user can change it from outside the app, and a second
+    /// copy of it in our file would only ever be the one that was wrong.
+    pub launch_at_login: bool,
+    /// Why we could not tell. Distinguishes "off" from "unknown".
+    pub launch_at_login_error: Option<String>,
+    /// Where session.json and settings.json live. Shown under Advanced so a
+    /// user can find, inspect or delete them.
+    pub app_data_dir: String,
+}
+
+#[tauri::command]
+pub async fn get_settings(
+    app: AppHandle,
+    state: State<'_, SettingsState>,
+) -> Result<SettingsView, AppError> {
+    let (shortcut, shortcut_active, shortcut_error) = {
+        let live = state.live.lock().map_err(|_| AppError::Internal("settings lock".into()))?;
+        (live.settings.shortcut.clone(), live.active.clone(), live.error.clone())
+    };
+
+    let (launch_at_login, launch_at_login_error) = match launch_at_login_enabled(&app) {
+        Ok(v) => (v, None),
+        Err(e) => (false, Some(e)),
+    };
+
+    Ok(SettingsView {
+        shortcut,
+        shortcut_active,
+        shortcut_error,
+        launch_at_login,
+        launch_at_login_error,
+        app_data_dir: state
+            .store
+            .path()
+            .parent()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+    })
+}
+
+/// Changes or clears the global hotkey.
+///
+/// `None` disables it. Always resolves: a rejected combo comes back as an
+/// outcome describing which binding is actually live, never as a thrown error,
+/// because "your new combo did not take and here is what you still have" is
+/// information the screen has to render either way.
+///
+/// async, and that is load-bearing: the plugin marshals both OS calls onto the
+/// main thread and blocks on the reply, so running this inline on the main
+/// thread would be waiting for itself.
+#[tauri::command]
+pub async fn set_shortcut(
+    app: AppHandle,
+    state: State<'_, SettingsState>,
+    shortcut: Option<String>,
+) -> Result<ShortcutOutcome, AppError> {
+    Ok(shortcut::set(&app, &state, shortcut))
+}
+
+/// Turns launch at login on or off, and answers with what the OS reports
+/// afterwards rather than with what was asked for.
+#[tauri::command]
+pub async fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<bool, AppError> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let manager = app.autolaunch();
+    let result = if enabled { manager.enable() } else { manager.disable() };
+    result.map_err(|e| AppError::Internal(e.to_string()))?;
+
+    launch_at_login_enabled(&app).map_err(AppError::Internal)
+}
+
+fn launch_at_login_enabled(app: &AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
 /// Public half of the release key that signs integrity.json, baked in at
@@ -280,7 +373,7 @@ mod tests {
     fn allows_the_api_host_the_bot_and_github() {
         assert!(is_allowed("https://swattedw.tf/dashboard/plans", BASE));
         assert!(is_allowed("https://t.me/swatted_bot", BASE));
-        assert!(is_allowed("https://github.com/sujrb/swattedwtf-app/releases", BASE));
+        assert!(is_allowed("https://github.com/swattedwtf/swattedwtf-app/releases", BASE));
     }
 
     #[test]

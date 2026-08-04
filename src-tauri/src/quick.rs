@@ -13,8 +13,14 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub const QUICK_LABEL: &str = "quick";
 
-/// Default binding. Chosen to sit outside the common Windows and browser
-/// shortcuts: Ctrl+Space is IME switching, Ctrl+Shift+Space is generally free.
+/// Starting binding, for a machine with no settings.json yet.
+///
+/// It is only the default. The live binding comes from settings.json and is
+/// owned by `shortcut.rs`; nothing in this file registers anything. Ctrl+Shift
+/// +Space was chosen to sit outside the common Windows and browser shortcuts
+/// (Ctrl+Space is IME switching), but it is not free everywhere: Word uses it
+/// for a non-breaking space and JetBrains IDEs for Smart Type Completion, which
+/// is why it is now changeable and can be turned off.
 pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
 
 /// Sized for the two-row bar in QuickLookup.tsx: a 62px field row over a 40px

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window only. Deliberately does NOT grant opener:default: its http(s)://* scope would let the webview open any URL directly and bypass the open_external allowlist, and reveal-item-in-dir has no scope check at all. open_external calls the opener from Rust, which does not go through this ACL.",
+  "description": "Main window only. Deliberately does NOT grant opener:default: its http(s)://* scope would let the webview open any URL directly and bypass the open_external allowlist, and reveal-item-in-dir has no scope check at all. open_external calls the opener from Rust, which does not go through this ACL. autostart:default is absent for the same reason and needs no replacement: launch at login is reached through set_launch_at_login in commands.rs, which calls the plugin from Rust, so the plugin's own enable/disable/is_enabled commands are never invoked from the webview and granting them would only add a second, unguarded way in.",
   "windows": [
     "main",
     "quick"

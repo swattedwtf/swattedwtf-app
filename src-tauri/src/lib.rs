@@ -11,6 +11,8 @@ pub mod config;
 pub mod error;
 pub mod integrity;
 pub mod quick;
+pub mod settings;
+pub mod shortcut;
 pub mod window_chrome;
 pub mod session;
 pub mod updater;
@@ -18,38 +20,29 @@ pub mod updater;
 use api::client::ApiClient;
 use commands::AppState;
 use session::SessionStore;
+use settings::{SettingsState, SettingsStore};
 use tauri::Manager;
-
-/// Binds the system-wide shortcut that summons the overlay.
-///
-/// A failure here is deliberately not fatal: the shortcut can be taken by
-/// another application, and losing one convenience is no reason to refuse to
-/// start. The Settings screen reports whether it bound.
-fn register_quick_shortcut(app: &tauri::AppHandle) {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-
-    let handle = app.clone();
-    let result = app.global_shortcut().on_shortcut(
-        quick::DEFAULT_SHORTCUT,
-        move |_app, _shortcut, event| {
-            // Fire on press only; without this the release fires a second
-            // toggle and the overlay flickers shut again.
-            if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                quick::toggle(&handle);
-            }
-        },
-    );
-
-    if let Err(e) = result {
-        eprintln!("[quick] could not register {}: {e}", quick::DEFAULT_SHORTCUT);
-    }
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Launch at login. On Windows this writes an HKEY_CURRENT_USER \Run
+        // value, so it needs no elevation; on macOS the LaunchAgent form is
+        // used rather than AppleScript, because the AppleScript path drives
+        // System Events and shows up as an automation permission prompt. No
+        // arguments are passed: the app has no autostart-specific behaviour to
+        // switch on, and an argument it ignores would only be a thing to
+        // explain later.
+        //
+        // Deliberately NOT exposed to the webview. The frontend goes through
+        // set_launch_at_login in commands.rs, the same way it reaches every
+        // other privileged operation, so there is one place this is done from.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -71,6 +64,17 @@ pub fn run() {
             app.manage(AppState { client });
             app.manage(updater::PendingUpdate::default());
 
+            // Preferences live beside the session fallback, in the same local
+            // data dir, and are loaded before anything reads them. A missing or
+            // damaged file resolves to the defaults rather than failing here:
+            // see the note at the top of settings.rs.
+            let settings_path = app
+                .path()
+                .app_local_data_dir()
+                .map(|d| d.join(settings::FILE_NAME))
+                .unwrap_or_else(|_| std::env::temp_dir().join("tf.swattedw.desktop-settings.json"));
+            app.manage(SettingsState::load(SettingsStore::new(settings_path)));
+
             // Two separate things, both needed. force_transparent clears the
             // background WebView2 paints beneath the HTML (it does not inherit
             // the window's alpha), which is what lets the page's antialiased
@@ -89,7 +93,10 @@ pub fn run() {
                 window_chrome::force_transparent(&overlay);
                 window_chrome::round_corners(&overlay, window_chrome::QUICK_RADIUS);
             }
-            register_quick_shortcut(app.handle());
+            // The hotkey comes from settings.json, not from a constant, and the
+            // user may have turned it off entirely. Whether it bound is
+            // recorded on the state so the Settings screen can report it.
+            shortcut::bind_at_startup(app.handle(), &app.state::<SettingsState>());
 
             Ok(())
         })
@@ -108,6 +115,9 @@ pub fn run() {
             commands::get_overview,
             commands::lookup,
             commands::fetch_image,
+            commands::get_settings,
+            commands::set_shortcut,
+            commands::set_launch_at_login,
         ])
         // Closing the main window must end the process.
         //
