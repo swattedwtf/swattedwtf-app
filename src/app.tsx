@@ -16,6 +16,7 @@ import { ApiAccess } from "./modules/api-access"
 import { FaceScreen } from "./modules/face"
 import { Investigations } from "./investigations/Investigations"
 import { MonitorScreen } from "./modules/monitor"
+import { ServerIntel } from "./server-intel/ServerIntel"
 import { moduleForRoute } from "./modules/registry"
 import { streamModuleForRoute } from "./modules/stream-registry"
 import { Settings } from "./settings/Settings"
@@ -254,6 +255,12 @@ export default function App() {
               // nothing metered. It owns two views (the case list and one open
               // case) behind this single route, since the app has no router.
               <Investigations />
+            ) : route === "/roblox/server-intel" ? (
+              // Not a module either, and the least module-like screen here: a
+              // pairing session with an in-game connector rather than a query
+              // and an answer. It polls its own unmetered endpoint, which is
+              // Heist-gated on minting exactly as the web's pair route is.
+              <ServerIntel />
             ) : route === "/face" ? (
               // A metered lookup like any other, and the only credit-billed one,
               // but its input is an image rather than a string, so it brings its

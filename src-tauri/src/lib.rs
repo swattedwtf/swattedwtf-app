@@ -14,6 +14,7 @@ pub mod monitor;
 pub mod investigations;
 pub mod picker;
 pub mod quick;
+pub mod server_intel;
 pub mod settings;
 pub mod shortcut;
 pub mod window_chrome;
@@ -126,6 +127,7 @@ pub fn run() {
             commands::fetch_image,
             commands::pick_image,
             commands::monitor,
+            commands::server_intel,
             commands::get_settings,
             commands::set_shortcut,
             commands::set_launch_at_login,

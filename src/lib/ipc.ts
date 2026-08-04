@@ -216,6 +216,24 @@ export const ipc = {
    */
   monitor: (action: string, input: Record<string, unknown> = {}) =>
     invoke<Record<string, unknown>>("monitor", { action, input }),
+
+  /**
+   * Runs one Roblox Server Intel action: `pair`, `unpair`, `state`, `overlay`,
+   * `highlight` or `player`.
+   *
+   * Deliberately NOT `lookup`. Server Intel is a pairing session that the screen
+   * POLLS, so metering it would spend a search every few seconds for watching a
+   * screen. The server gates minting a connector on the Heist plan and on the
+   * web's own two-per-five-hours budget, and leaves the rest signed-in only,
+   * exactly as the browser does.
+   *
+   * The answer stays untyped here for the same reason a lookup payload does. The
+   * screen coerces it through `withDefaults`/`list` before rendering, so a
+   * server that answers with a shape this build does not know draws a sparse
+   * screen rather than throwing inside React's render.
+   */
+  serverIntel: (action: string, input: Record<string, unknown> = {}) =>
+    invoke<Record<string, unknown>>("server_intel", { action, input }),
 }
 
 /** One parsed SSE `data:` event from a stream. Its shape is the module's own. */

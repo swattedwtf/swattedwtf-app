@@ -172,6 +172,29 @@ pub async fn monitor(
     crate::monitor::call(&state.client, &action, input).await
 }
 
+/// Runs one Roblox Server Intel action: mint a connector, drop it, read the
+/// session, toggle the in-game overlay, highlight a player, open one dossier.
+///
+/// Separate from `lookup` on purpose, and for a stronger reason than Monitor's.
+/// Server Intel is a pairing SESSION: the screen POLLS it every few seconds, so
+/// routing it through the metered lookup endpoint would have spent a search per
+/// tick for watching a screen. Minting a connector is the one part the server
+/// gates on the Heist plan and rate limits, exactly as the web does, and both
+/// surfaces share the one budget.
+///
+/// `action` is a key into a fixed set on the SERVER, never a URL or a path
+/// fragment, so there is no caller-supplied destination in this call. The
+/// in-game ingest and connector routes are not in that set: they belong to the
+/// executor, which authenticates with the pairing key rather than a session.
+#[tauri::command]
+pub async fn server_intel(
+    state: State<'_, AppState>,
+    action: String,
+    input: serde_json::Value,
+) -> Result<serde_json::Value, AppError> {
+    crate::server_intel::call(&state.client, &action, input).await
+}
+
 /// Everything the Settings screen needs that is not already in the overview.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

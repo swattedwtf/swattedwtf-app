@@ -86,6 +86,14 @@ export const MODULES: ModuleDescriptor[] = [
  * fields, and a descriptor whose only input is a file has no field to declare,
  * so it would have to lie about its inputs to be registered. It calls the same
  * `ipc.lookup` and reuses the same refusal panels; only the form is its own.
+ *
+ * `/roblox/server-intel` is the third Roblox leaf and the least module-like
+ * screen in the app. It is a pairing SESSION: the operator mints a one-time
+ * connector, runs it in their Roblox executor, and the screen then polls the
+ * roster that connector reports. There is no text input to declare and nothing
+ * metered to charge, so it talks to its own unmetered endpoint rather than the
+ * lookup one. Minting a connector is still Heist-gated and rate-limited
+ * server-side, exactly as the web's pair route is.
  */
 export const BUILT_IN_ROUTES = [
   "/dashboard",
@@ -94,6 +102,7 @@ export const BUILT_IN_ROUTES = [
   "/monitor",
   "/investigations",
   "/face",
+  "/roblox/server-intel",
 ]
 
 /**
