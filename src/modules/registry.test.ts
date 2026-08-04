@@ -113,9 +113,35 @@ describe("moduleForRoute", () => {
 })
 
 describe("descriptors", () => {
-  it("gives every module a unique id and route", () => {
-    expect(new Set(MODULES.map((m) => m.id)).size).toBe(MODULES.length)
+  it("gives every module a unique route", () => {
     expect(new Set(MODULES.map((m) => m.route)).size).toBe(MODULES.length)
+  })
+
+  /**
+   * Ids are deliberately NOT unique. Snapchat's three routes are one server
+   * module, because /api/snapchat/lookup sniffs whether it was handed a
+   * username, an email or a phone number. Splitting them into three ids would
+   * split one lookup across three cache keys and three dedup members and bill
+   * the same answer more than once, so the id is shared on purpose.
+   *
+   * What must hold is that every id is a real server module key, which is a
+   * short closed list.
+   */
+  it("names a server module on every descriptor", () => {
+    for (const m of MODULES) {
+      expect(m.id.length, `${m.route} has no module id`).toBeGreaterThan(0)
+      expect(m.id, `${m.route} has a path or host as its id`).toMatch(/^[a-z0-9-]+$/)
+    }
+  })
+
+  it("shares one id across the Snapchat routes so a lookup is billed once", () => {
+    const snap = MODULES.filter((m) => m.route.startsWith("/snapchat"))
+    expect(snap.map((m) => m.route).sort()).toEqual([
+      "/snapchat",
+      "/snapchat/email",
+      "/snapchat/phone",
+    ])
+    expect(new Set(snap.map((m) => m.id))).toEqual(new Set(["snapchat"]))
   })
 
   it("gives every input a unique name, a label and a placeholder", () => {

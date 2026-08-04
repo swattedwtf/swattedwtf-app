@@ -13,6 +13,9 @@ import { Home } from "./dashboard/Home"
 import { ModuleScreen } from "./modules/ModuleScreen"
 import { StreamScreen } from "./modules/StreamScreen"
 import { ApiAccess } from "./modules/api-access"
+import { FaceScreen } from "./modules/face"
+import { Investigations } from "./investigations/Investigations"
+import { MonitorScreen } from "./modules/monitor"
 import { moduleForRoute } from "./modules/registry"
 import { streamModuleForRoute } from "./modules/stream-registry"
 import { Settings } from "./settings/Settings"
@@ -240,6 +243,24 @@ export default function App() {
               // Not a module: no inputs, no metered call, and its data is the
               // overview already in hand. See BUILT_IN_ROUTES in the registry.
               <ApiAccess overview={overview} />
+            ) : route === "/monitor" ? (
+              // Not a module either: Monitor is a subscription surface, so it
+              // has no query to submit and nothing to meter. It fetches its own
+              // state on mount over an unmetered endpoint that is Heist-gated
+              // server-side, exactly as the web's monitor routes are.
+              <MonitorScreen />
+            ) : route === "/investigations" ? (
+              // A case manager, not a lookup: no target to search for and
+              // nothing metered. It owns two views (the case list and one open
+              // case) behind this single route, since the app has no router.
+              <Investigations />
+            ) : route === "/face" ? (
+              // A metered lookup like any other, and the only credit-billed one,
+              // but its input is an image rather than a string, so it brings its
+              // own form instead of ModuleScreen's fields. The overview is
+              // passed for the wallet balance: this is the one screen where
+              // pressing Search spends money outright.
+              <FaceScreen overview={overview} />
             ) : route === "/settings" ? (
               <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
             ) : (

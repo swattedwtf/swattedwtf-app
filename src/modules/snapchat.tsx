@@ -181,6 +181,32 @@ export function Result({ data }: ResultProps) {
   )
 }
 
+/** The server's QUERY_MAX, the same bound /api/snapchat/lookup enforces. */
+const QUERY_MAX = 120
+
+/** The server's EMAIL_RE, from lib/desktop/modules/snapchat.ts. */
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+/**
+ * `normalizePhone` from lib/phone-validation.ts, mirrored.
+ *
+ * Deliberately NOT the looser rule the TikTok module carries: that one accepts
+ * a bare national number, and this server path refuses anything without an
+ * explicit international prefix because it cannot guess a country code. Copying
+ * the wrong sibling would let the client wave through a number the server then
+ * rejects, after the gate has already metered the call.
+ */
+function normalizeSnapPhone(value: string): string | null {
+  let s = value.trim()
+  if (!s) return null
+  if (s.startsWith("00")) s = "+" + s.slice(2)
+  const hadPlus = s.startsWith("+")
+  const digits = s.replace(/\D/g, "")
+  if (!digits || !hadPlus) return null
+  const e164 = "+" + digits
+  return /^\+[1-9]\d{6,14}$/.test(e164) ? e164 : null
+}
+
 export const descriptor: ModuleDescriptor = {
   id: "snapchat",
   route: "/snapchat",
@@ -191,9 +217,65 @@ export const descriptor: ModuleDescriptor = {
       label: "Username, email or phone",
       placeholder: "e.g. teamsnapchat, name@example.com, +14155550123",
       validate: (v) =>
-        v.trim().length > 0 && v.trim().length <= 120
+        v.trim().length > 0 && v.trim().length <= QUERY_MAX
           ? null
           : "Enter a Snapchat username, email or phone number.",
+    },
+  ],
+  Result,
+}
+
+/**
+ * Email to User and Phone to User.
+ *
+ * The same server module and the same `id`, because one route answers all three
+ * categories: `detectSnapchatKind` sniffs the query itself. Giving these their
+ * own module ids would split one lookup into three cache keys and three dedup
+ * members, so a user who checked a number here and then on the web would pay
+ * twice for one answer.
+ *
+ * What differs is the field. The web splits these into their own pages, and a
+ * page that asks for an email should refuse a username rather than quietly run
+ * a different lookup than the one its heading promised, so each validates for
+ * its own kind instead of reusing the permissive combined rule above.
+ */
+export const emailDescriptor: ModuleDescriptor = {
+  id: "snapchat",
+  route: "/snapchat/email",
+  label: "Snapchat email to user",
+  inputs: [
+    {
+      name: "query",
+      label: "Email address",
+      placeholder: "e.g. name@example.com",
+      validate: (v) => {
+        const trimmed = v.trim()
+        if (!trimmed || trimmed.length > QUERY_MAX || !EMAIL_RE.test(trimmed)) {
+          return "Enter a valid email address."
+        }
+        return null
+      },
+    },
+  ],
+  Result,
+}
+
+export const phoneDescriptor: ModuleDescriptor = {
+  id: "snapchat",
+  route: "/snapchat/phone",
+  label: "Snapchat phone to user",
+  inputs: [
+    {
+      name: "query",
+      label: "Phone number",
+      placeholder: "e.g. +14155550123",
+      validate: (v) => {
+        const trimmed = v.trim()
+        if (!trimmed || trimmed.length > QUERY_MAX || normalizeSnapPhone(trimmed) === null) {
+          return "Enter a phone number in full international format, starting with + and a country code."
+        }
+        return null
+      },
     },
   ],
   Result,

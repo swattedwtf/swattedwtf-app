@@ -3,7 +3,11 @@ import { descriptor as instagram, shareDescriptor as instagramShare } from "./in
 import { descriptor as machine } from "./machine"
 import { descriptor as minecraft } from "./minecraft"
 import { descriptor as roblox, scraperDescriptor as robloxScraper } from "./roblox"
-import { descriptor as snapchat } from "./snapchat"
+import {
+  descriptor as snapchat,
+  emailDescriptor as snapchatEmail,
+  phoneDescriptor as snapchatPhone,
+} from "./snapchat"
 import { phoneDescriptor as telegramPhone, userDescriptor as telegram } from "./telegram"
 import {
   descriptor as tiktok,
@@ -34,6 +38,8 @@ import type { ModuleDescriptor } from "./types"
 export const MODULES: ModuleDescriptor[] = [
   discord,
   snapchat,
+  snapchatEmail,
+  snapchatPhone,
   telegram,
   telegramPhone,
   minecraft,
@@ -63,8 +69,32 @@ export const MODULES: ModuleDescriptor[] = [
  * has no inputs, no server module and no metered call. Everything it renders is
  * already in the Overview the app fetches at boot, so routing it through
  * ModuleScreen would mean inventing a module id the server would reject.
+ *
+ * `/monitor` is here for the same reason and a stronger one. Monitor is a
+ * subscription: the user registers an email and the server's scanner reports
+ * back later. There is no query, no result to cache and nothing to meter, so it
+ * talks to its own unmetered endpoint rather than the lookup one. It is still
+ * Heist-gated server-side, exactly as the web's monitor routes are.
+ *
+ * `/investigations` is here for the same reason again: it is a case manager, not
+ * a search. There is no target to look up, its server route is gated on the
+ * ordinary signed-in mutation gate rather than the metered lookup gate, and its
+ * screen is a list and a notepad rather than a form and a result.
+ *
+ * `/face` is here for a different reason: it IS a metered lookup, and a
+ * credit-billed one, but its input is an image. ModuleScreen renders text
+ * fields, and a descriptor whose only input is a file has no field to declare,
+ * so it would have to lie about its inputs to be registered. It calls the same
+ * `ipc.lookup` and reuses the same refusal panels; only the form is its own.
  */
-export const BUILT_IN_ROUTES = ["/dashboard", "/settings", "/api"]
+export const BUILT_IN_ROUTES = [
+  "/dashboard",
+  "/settings",
+  "/api",
+  "/monitor",
+  "/investigations",
+  "/face",
+]
 
 /**
  * The module owning a route, or undefined.

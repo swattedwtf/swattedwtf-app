@@ -104,6 +104,23 @@ pub async fn stream_cancel(streams: State<'_, StreamRegistry>, id: u64) -> Resul
     Ok(())
 }
 
+/// Runs one Investigations case-manager action (list, get, create, update,
+/// delete) and returns the route's payload.
+///
+/// NOT a lookup: a case list and a notepad run no providers and spend no
+/// credits, so the server gates this on the ordinary signed-in mutation gate
+/// rather than the metered lookup gate. `action` is a key into a closed set on
+/// the SERVER; the path is a constant in investigations.rs, so there is no
+/// caller-supplied destination in this call.
+#[tauri::command]
+pub async fn investigations(
+    state: State<'_, AppState>,
+    action: String,
+    input: serde_json::Value,
+) -> Result<serde_json::Value, AppError> {
+    crate::investigations::call(&state.client, &action, input).await
+}
+
 /// Fetches an image and hands the webview a `data:` URL.
 ///
 /// The webview cannot load a remote image at all (its CSP is
@@ -115,6 +132,44 @@ pub async fn stream_cancel(streams: State<'_, StreamRegistry>, id: u64) -> Resul
 #[tauri::command]
 pub async fn fetch_image(state: State<'_, AppState>, url: String) -> Result<String, AppError> {
     lookup_api::fetch_image(&state.client, &url).await
+}
+
+/// Opens a native picker and returns the chosen image as a `data:` URL.
+///
+/// Reverse Face is the one module whose input is a file. The dialog, the read
+/// and the validation all happen HERE, exactly as `save_recovery_file` writes
+/// one: the webview holds no filesystem permission at all, so the only path
+/// this ever touches is the one a person chose in an OS dialog and nothing
+/// running in the page can name a path of its own.
+///
+/// A `data:` URL rather than a path or a handle, because the webview's CSP is
+/// `img-src 'self' data:` and that is the only form a preview can render. The
+/// same value is what the lookup uploads, so there is one representation to
+/// validate rather than two to keep in agreement.
+///
+/// Returns None when the user cancels.
+#[tauri::command]
+pub async fn pick_image(app: AppHandle) -> Result<Option<crate::picker::PickedImage>, AppError> {
+    crate::picker::pick(&app).await
+}
+
+/// Runs one Monitor action: list the watched emails, add one, remove one, read a
+/// watch's recent scanner runs.
+///
+/// Separate from `lookup` on purpose. Monitor is a subscription surface rather
+/// than a search: its server route is gated on the Heist plan exactly as the
+/// web's monitor routes are, but it is not metered, and routing it through the
+/// lookup endpoint would have charged a search for opening the screen.
+///
+/// `action` is a key into a fixed set on the SERVER, never a URL or a path
+/// fragment, so there is no caller-supplied destination in this call either.
+#[tauri::command]
+pub async fn monitor(
+    state: State<'_, AppState>,
+    action: String,
+    input: serde_json::Value,
+) -> Result<serde_json::Value, AppError> {
+    crate::monitor::call(&state.client, &action, input).await
 }
 
 /// Everything the Settings screen needs that is not already in the overview.

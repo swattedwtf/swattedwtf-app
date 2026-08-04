@@ -10,6 +10,9 @@ pub mod commands;
 pub mod config;
 pub mod error;
 pub mod integrity;
+pub mod monitor;
+pub mod investigations;
+pub mod picker;
 pub mod quick;
 pub mod settings;
 pub mod shortcut;
@@ -119,7 +122,10 @@ pub fn run() {
             commands::lookup,
             commands::stream_start,
             commands::stream_cancel,
+            commands::investigations,
             commands::fetch_image,
+            commands::pick_image,
+            commands::monitor,
             commands::get_settings,
             commands::set_shortcut,
             commands::set_launch_at_login,

@@ -98,6 +98,24 @@ export type LoginOutcome =
 
 export type RegisterOutcome = { status: "ok"; code: string } | { status: "error"; message: string }
 
+/**
+ * An image the user picked in the native dialog.
+ *
+ * `dataUrl` is both the preview `src` and the value uploaded to the face
+ * module: the webview cannot read a file and cannot render a remote image, so
+ * Rust hands over the one representation that serves both. `name` is the file's
+ * own name and never a path; where the user keeps their pictures has no reason
+ * to cross the boundary.
+ */
+export type PickedImage = {
+  name: string
+  /** Sniffed from the bytes by Rust, not taken from the extension. */
+  mime: string
+  /** Decoded size in bytes, so a caption does not have to measure base64. */
+  bytes: number
+  dataUrl: string
+}
+
 export type WindowDiagnostics = {
   decorated: boolean | null
   maximized: boolean | null
@@ -145,6 +163,23 @@ export const ipc = {
     invoke<LookupResult>("lookup", { module, input }),
 
   /**
+   * Runs one Investigations case-manager action.
+   *
+   * Deliberately separate from `lookup`. A case list and a notepad are not a
+   * metered search, and the server gates this route on the ordinary signed-in
+   * mutation gate rather than on the lookup gate, so routing it through the
+   * lookup command would have charged the desktop for something the web gives
+   * away.
+   *
+   * `action` is a key into a closed set on the server, never a path. The answer
+   * stays untyped here for the same reason a lookup's does: the screen that
+   * renders it is the right place to describe its shape, and it coerces every
+   * field through `withDefaults` before reading one.
+   */
+  investigations: (action: string, input: Record<string, unknown> = {}) =>
+    invoke<Record<string, unknown>>("investigations", { action, input }),
+
+  /**
    * Resolves an image URL from a lookup payload into a `data:` URL.
    *
    * Needed because the webview's CSP is `img-src 'self' data:`, so no remote
@@ -153,6 +188,34 @@ export const ipc = {
    * rejected URL here is a bug in the payload, not something to work around.
    */
   fetchImage: (url: string) => invoke<string>("fetch_image", { url }),
+
+  /**
+   * Opens a native picker and returns the chosen image, or null if cancelled.
+   *
+   * The dialog, the read and the validation all happen in Rust. The webview
+   * holds no filesystem permission at all, so this is the only way a file
+   * reaches the app and the only path involved is one a person chose in an OS
+   * dialog. What comes back is a `data:` URL because that is the one form the
+   * CSP (`img-src 'self' data:`) lets a preview render, and it doubles as the
+   * payload the face lookup uploads.
+   */
+  pickImage: () => invoke<PickedImage | null>("pick_image"),
+
+  /**
+   * Runs one Monitor action: `list`, `create`, `delete` or `runs`.
+   *
+   * Deliberately NOT `lookup`. Monitor is a subscription surface, so its server
+   * route is gated on the Heist plan the way the web's monitor routes are but is
+   * not metered: opening the screen must not cost a search. `action` is a key
+   * into a fixed set on the server, never a path.
+   *
+   * The answer stays untyped here for the same reason a lookup payload does. The
+   * Monitor screen coerces it through `withDefaults`/`list` before rendering, so
+   * a server that answers with a shape this build does not know draws a sparse
+   * screen rather than throwing inside React's render.
+   */
+  monitor: (action: string, input: Record<string, unknown> = {}) =>
+    invoke<Record<string, unknown>>("monitor", { action, input }),
 }
 
 /** One parsed SSE `data:` event from a stream. Its shape is the module's own. */

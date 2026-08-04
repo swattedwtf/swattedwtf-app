@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 
-import { Result, descriptor } from "./snapchat"
+import { Result, descriptor, emailDescriptor, phoneDescriptor } from "./snapchat"
 
 const found = {
   kind: "username",
@@ -89,5 +89,49 @@ describe("Snapchat descriptor", () => {
     expect(check("+14155550123")).toBeNull()
     expect(check("")).toBeTruthy()
     expect(check("x".repeat(121))).toBeTruthy()
+  })
+})
+
+describe("Snapchat email to user", () => {
+  const check = emailDescriptor.inputs[0].validate
+
+  it("accepts an email address", () => {
+    expect(check("someone@example.com")).toBeNull()
+    expect(check("  someone@example.com  ")).toBeNull()
+  })
+
+  it("refuses anything that is not an email", () => {
+    // The page's heading promises an email lookup. Letting a username through
+    // would run a different lookup than the one asked for, and bill for it.
+    expect(check("teamsnapchat")).toBeTruthy()
+    expect(check("+14155550123")).toBeTruthy()
+    expect(check("someone@example")).toBeTruthy()
+    expect(check("")).toBeTruthy()
+    // 121 characters: one past the server's QUERY_MAX.
+    expect(check(`${"a".repeat(116)}@b.co`)).toBeTruthy()
+  })
+})
+
+describe("Snapchat phone to user", () => {
+  const check = phoneDescriptor.inputs[0].validate
+
+  it("accepts a full international number", () => {
+    expect(check("+14155550123")).toBeNull()
+    expect(check("+1 (415) 555-0123")).toBeNull()
+    expect(check("0014155550123")).toBeNull()
+  })
+
+  it("refuses a number with no country code", () => {
+    // lib/phone-validation.ts refuses to guess a country, so a bare national
+    // number is rejected here rather than metered and then refused server-side.
+    expect(check("4155550123")).toBeTruthy()
+    expect(check("(415) 555-0123")).toBeTruthy()
+  })
+
+  it("refuses anything that is not a phone number", () => {
+    expect(check("teamsnapchat")).toBeTruthy()
+    expect(check("someone@example.com")).toBeTruthy()
+    expect(check("")).toBeTruthy()
+    expect(check("+1")).toBeTruthy()
   })
 })
