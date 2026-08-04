@@ -48,7 +48,7 @@ describe("a registered module", () => {
   // exists, not because someone remembered to edit a second list.
   const stub: ModuleDescriptor = {
     id: "stub",
-    route: "/discord",
+    route: "/minecraft",
     label: "Stub",
     inputs: [],
     Result: () => null,
@@ -58,16 +58,21 @@ describe("a registered module", () => {
     expect(isEnabled(stub.route)).toBe(false)
     MODULES.push(stub)
     try {
-      expect(enabledRoutes()).toContain("/discord")
-      expect(isEnabled("/discord")).toBe(true)
-      expect(moduleForRoute("/discord")).toBe(stub)
+      expect(enabledRoutes()).toContain(stub.route)
+      expect(isEnabled(stub.route)).toBe(true)
+      expect(moduleForRoute(stub.route)).toBe(stub)
       // Still exact: a child route is a different screen, not this one.
-      expect(isEnabled("/discord/evil")).toBe(false)
-      expect(moduleForRoute("/discord/evil")).toBeUndefined()
+      expect(isEnabled(`${stub.route}/evil`)).toBe(false)
+      expect(moduleForRoute(`${stub.route}/evil`)).toBeUndefined()
     } finally {
       MODULES.splice(MODULES.indexOf(stub), 1)
     }
-    expect(isEnabled("/discord")).toBe(false)
+    expect(isEnabled(stub.route)).toBe(false)
+  })
+
+  it("has Discord registered, so its nav row is live", () => {
+    expect(MODULES.map((m) => m.route)).toContain("/discord")
+    expect(moduleForRoute("/discord")?.id).toBe("discord")
   })
 })
 

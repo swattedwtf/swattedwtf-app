@@ -56,16 +56,19 @@ describe("NAV", () => {
 })
 
 describe("isEnabled", () => {
-  it("enables only the dashboard and settings in v1", () => {
-    expect(ENABLED_ROUTES).toEqual(["/dashboard", "/settings"])
+  it("enables the built-in screens plus every registered module", () => {
+    // Derived from the registry rather than hand-maintained, so this list grows
+    // exactly when a module ships and the two cannot fall out of step.
+    expect(ENABLED_ROUTES).toEqual(["/dashboard", "/settings", "/discord"])
     expect(isEnabled("/dashboard")).toBe(true)
     expect(isEnabled("/settings")).toBe(true)
+    expect(isEnabled("/discord")).toBe(true)
   })
 
-  it("disables every module route", () => {
-    expect(isEnabled("/discord")).toBe(false)
+  it("still disables a module that has no descriptor yet", () => {
     expect(isEnabled("/tools/falcon")).toBe(false)
     expect(isEnabled("/search")).toBe(false)
+    expect(isEnabled("/snapchat")).toBe(false)
   })
 
   it("does not enable a route merely because it starts with an enabled one", () => {

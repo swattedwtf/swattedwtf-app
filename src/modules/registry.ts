@@ -1,3 +1,4 @@
+import { descriptor as discord } from "./discord"
 import type { ModuleDescriptor } from "./types"
 
 /**
@@ -7,11 +8,10 @@ import type { ModuleDescriptor } from "./types"
  * `nav.ts` derives `isEnabled` from it, so a "soon" pill disappears exactly
  * when a module gains a descriptor and the two cannot drift apart.
  *
- * Empty for now. Discord is added by the next task, alone, because it is the
- * widest module and it proves the shared primitives before anything else is
- * written against them.
+ * Discord came first and alone: it is the widest module, so building it before
+ * anything else proved the shared primitives could carry the rest.
  */
-export const MODULES: ModuleDescriptor[] = []
+export const MODULES: ModuleDescriptor[] = [discord]
 
 /** Screens that exist without a descriptor. */
 const BUILT_IN_ROUTES = ["/dashboard", "/settings"]
