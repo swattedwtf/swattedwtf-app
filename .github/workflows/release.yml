@@ -22,8 +22,10 @@ jobs:
         include:
           - platform: ubuntu-22.04
             args: ""
+            cacheKey: linux-release
           - platform: windows-latest
             args: ""
+            cacheKey: windows-release
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -35,9 +37,15 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # shared-key, not the default per-job key, so this restores what the CI
+      # workflow's release-cache jobs left on main. This workflow only runs on
+      # tags, and a cache saved under refs/tags/vX is invisible to refs/tags/vY,
+      # so without a warm cache on the default branch every release compiled the
+      # entire dependency tree from scratch.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: ${{ matrix.cacheKey }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'

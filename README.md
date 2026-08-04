@@ -6,8 +6,10 @@ React and TypeScript.
 All HTTP and all secret storage live in Rust. The webview is a rendering layer: it
 never receives a session token, and there is no command that hands one to it.
 
-Targets Windows (`.msi`, NSIS `.exe`) and Linux (`.deb`, `.AppImage`). There is no
-macOS build in v1.
+Targets Windows (NSIS `-setup.exe`) and Linux (`.deb`, `.AppImage`). There is no
+macOS build in v1. The Windows installer is per-user and needs no administrator
+prompt. An `.msi` was published up to v0.1.8 and is gone from later releases: it
+required elevation, and nothing ever linked to it.
 
 > **Screenshot to add before release:** the boot sequence (verify, update check,
 > welcome reveal), plus the Windows SmartScreen dialog described below. No

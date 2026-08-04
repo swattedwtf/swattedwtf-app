@@ -30,9 +30,13 @@ jobs:
         with:
           components: clippy
 
+      # shared-key rather than the default per-job key, so the release workflow
+      # can restore what this job built. See warm-windows-cache below for why
+      # that matters.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: linux-release
 
       # Tauri links against WebKitGTK and friends, so the Rust crates do not
       # even compile without these present.
@@ -72,3 +76,63 @@ jobs:
       - name: Lint the Rust code
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
+
+      # Everything above builds in DEBUG, and the release workflow builds in
+      # RELEASE, so without this the cache this job saves contains nothing a
+      # release can use. Only on main: a branch's cache is scoped to that branch
+      # and would be thrown away with it, so paying six minutes for one on every
+      # push and every PR would buy nothing.
+      - name: Warm the release cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: src-tauri
+        run: cargo build --release
+
+  # The Windows release build compiles 304 crates from scratch every single
+  # time, which is six and a half of its nine minutes. rust-cache is configured
+  # on the release workflow and never helps, because a cache is scoped to the
+  # ref that saved it and that workflow only runs on tag pushes: v0.1.7 saved a
+  # cache under refs/tags/v0.1.7 that refs/tags/v0.1.8 cannot read. A run CAN
+  # read the default branch's caches, so this job exists purely to put a warm
+  # Windows cache on main for the next tag to find.
+  #
+  # It builds the binary but does no bundling: WiX and NSIS take well under a
+  # minute between them, and it is the compile that needs caching.
+  warm-windows-cache:
+    name: warm the windows release cache
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Must match the shared-key the release workflow's Windows job asks for,
+      # or the two compute different keys and this warms nothing.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: windows-release
+
+      - run: npm ci
+
+      # tauri-build refuses to compile if a resource declared in
+      # tauri.conf.json is missing, and the manifest hashes dist/, so both of
+      # these have to happen before the Rust build even though nothing here
+      # ships. The key is ephemeral and thrown away with the runner.
+      - run: npm run build
+
+      - name: Generate a throwaway integrity manifest
+        shell: bash
+        run: |
+          mkdir -p src-tauri/resources
+          INTEGRITY_SIGNING_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+            node scripts/gen-integrity.mjs dist src-tauri/resources/integrity.json 0.0.0-ci
+
+      - name: Build in release
+        working-directory: src-tauri
+        run: cargo build --release
