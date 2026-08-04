@@ -185,13 +185,33 @@ describe("Roblox profile result", () => {
     expect(html.match(/https:\/\/roblox\.com\/login/g)?.length).toBeGreaterThan(0)
   })
 
-  it("names the sources that did not answer", () => {
-    const html = render(full, ["lookup"])
-    expect(html).toContain("Some sources did not answer: lookup.")
+  it("says the lookup failed, not that the account does not exist, on a failure", () => {
+    // The server splits a 404 (a complete answer) from every other non-2xx (a
+    // provider failure named "lookup"). Discarding that turned a Roblox outage
+    // into "this account does not exist", which is false about a real person.
+    const html = render(sparse, ["lookup"])
+    expect(html).toContain("did not complete")
+    expect(html).toContain("cannot say whether that account exists")
+    expect(html).not.toContain("No Roblox account resolves from")
+  })
+
+  it("still says not found when the lookup succeeded and found nothing", () => {
+    const html = render(sparse, [])
+    expect(html).toContain("No Roblox account resolves from")
+    expect(html).toContain("nobody")
+    expect(html).not.toContain("did not complete")
+  })
+
+  it("does not render partial a second time, since ResultView already names it", () => {
+    // Two lists meaning "this section is missing", in two vocabularies, was the
+    // same fact told twice. ResultView owns the one rendering.
+    expect(render(full, ["lookup"])).not.toContain("Some sources did not answer")
+    expect(render(full, ["lookup"])).not.toContain("Some sections did not load")
   })
 
   it("uses no em dashes in its own copy", () => {
     expect(render(sparse)).not.toContain("—")
+    expect(render(sparse, ["lookup"])).not.toContain("—")
     expect(render(full)).not.toContain("—")
   })
 })
@@ -241,13 +261,66 @@ describe("Roblox scraper result", () => {
     expect(html).not.toContain("truncated")
   })
 
-  it("shows an empty state when nothing matched", () => {
+  it("never presents an uncapped run as a proven complete pass", () => {
+    // `capped` covers only the 25,000-ID scan cap. The 95s time budget and the
+    // 10,000-row result cap also truncate a run and report nothing at all, so
+    // the screen says what the only trustworthy number is instead of implying
+    // the whole requested range was visited.
+    const html = renderScrape(scrapeFull)
+    expect(html).toContain("stop early")
+    expect(html).toContain("IDs visited")
+  })
+
+  it("distinguishes the live-match count from the number of rows returned", () => {
+    // `matched` counts LIVE accounts; `entries` also carries the deleted IDs
+    // when showDeleted was on. Two different numbers under near-identical
+    // labels ("Matched: N" beside "Matches (M)") read as one number disagreeing
+    // with itself.
+    const html = renderScrape({
+      ...scrapeFull,
+      matched: 1,
+      entries: [
+        ...scrapeFull.entries,
+        {
+          userId: 1235,
+          username: "",
+          displayName: "",
+          verified: false,
+          deleted: true,
+          status: "",
+          profileUrl: null,
+        },
+      ],
+    })
+    expect(html).toContain("Live accounts matched")
+    expect(html).toContain("Rows returned (2)")
+    expect(html).not.toContain(">Matched<")
+    expect(html).not.toContain("Matches (2)")
+  })
+
+  it("says the scan failed rather than reporting an empty range", () => {
+    // The server names a scan that threw or blew its budget as "scrape" and
+    // hands back zeroed counts. Rendering those said the range was empty.
+    const html = renderScrape(scrapeSparse, ["scrape"])
+    expect(html).toContain("did not complete")
+    expect(html).not.toContain("No accounts matched")
+    expect(html).not.toContain("Live accounts matched")
+  })
+
+  it("shows an empty state when the scan ran and nothing matched", () => {
     const html = renderScrape(scrapeSparse)
     expect(html).toContain("No accounts matched")
+    expect(html).not.toContain("did not complete")
+  })
+
+  it("does not render partial a second time, since ResultView already names it", () => {
+    expect(renderScrape(scrapeFull, ["scrape"])).not.toContain("Some sources did not answer")
   })
 
   it("uses no em dashes in its own copy", () => {
     expect(renderScrape(scrapeSparse)).not.toContain("—")
+    expect(renderScrape(scrapeSparse, ["scrape"])).not.toContain("—")
+    expect(renderScrape(scrapeFull)).not.toContain("—")
   })
 })
 

@@ -138,7 +138,7 @@ describe("runLookup", () => {
     expect(outcome.status === "failed" && outcome.error.kind).toBe("error")
   })
 
-  it("classifies a dead session as auth, which the screen renders as nothing", async () => {
+  it("classifies a dead session as auth, which the screen explains in words", async () => {
     lookup.mockRejectedValue(apiError(401, "Not authenticated"))
     const outcome = await runLookup(digits, { userId: "123456789012345" })
     expect(outcome.status === "failed" && outcome.error.kind).toBe("auth")
@@ -177,8 +177,23 @@ describe("OutcomePanel", () => {
     expect(render("error", "Upstream failed.")).toContain("Retry")
   })
 
-  it("renders nothing for a dead session, because the app is already leaving", () => {
-    expect(render("auth", "Not authenticated")).toBe("")
+  it("tells the user their session expired instead of rendering a blank panel", () => {
+    // A 401 on a MODULE lookup does not send the app back to login: only the
+    // overview path in app.tsx clears a dead session. Rendering nothing here
+    // left the user staring at an empty panel with a session that stayed dead.
+    const html = render("auth", "Not authenticated")
+    expect(html).not.toBe("")
+    expect(html).toContain("session has expired")
+    expect(html).toContain("sign in again")
+    // The server's copy for a 401 is the bare string "Not authenticated",
+    // which is not something a user can act on.
+    expect(html).not.toContain("Not authenticated")
+  })
+
+  it("offers a dead session no button, since nothing here can revive it", () => {
+    // Clearing the session belongs to app.tsx. A Retry would fail identically
+    // and an "Upgrade" would be nonsense, so the panel is words only.
+    expect(render("auth", "Not authenticated")).not.toContain("<button")
   })
 
   it("points the upgrade action at the plans page and the legal one at the terms", () => {
@@ -217,6 +232,7 @@ describe("OutcomePanel", () => {
       render("suspended", "x"),
       render("retry", "x"),
       render("error", "x"),
+      render("auth", "Not authenticated"),
     ].join("")
     expect(all).not.toContain("—")
   })

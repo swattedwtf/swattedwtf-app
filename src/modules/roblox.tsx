@@ -14,6 +14,11 @@ import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } 
  *
  * Nothing here styles a container of its own. Everything is `ui/`.
  *
+ * `partial` is NOT listed at the bottom of either Result. ResultView renders it
+ * once for every module, and a second list in this file's own vocabulary was
+ * the same fact told twice in two different words. It is still READ here, to
+ * separate a provider failure from a real not-found.
+ *
  * THE STEALER BLOCK IS HEIST ONLY. The server returns it empty with a 200 for
  * lower plans and sets `stealerLocked`, so an empty section here would read as
  * "we checked and found nothing" rather than "you cannot see this". That is why
@@ -157,21 +162,26 @@ export function Result({ data, partial }: ResultProps) {
   }
 
   if (!d.found) {
+    /**
+     * Two different empty answers, and they are not interchangeable.
+     *
+     * The server treats a 404 as a complete answer (there is no such user) and
+     * every other non-2xx, plus a timeout, as a provider failure named
+     * "lookup". Discarding that distinction turned a Roblox outage into "this
+     * account does not exist", which is a false statement about a real person.
+     */
     return (
-      <div className="space-y-4">
-        <EmptyState
-          message={
-            d.query
+      <EmptyState
+        message={
+          partial.includes("lookup")
+            ? `The Roblox lookup${
+                d.query ? ` for "${d.query}"` : ""
+              } did not complete, so we cannot say whether that account exists.`
+            : d.query
               ? `No Roblox account resolves from "${d.query}".`
               : "No Roblox account found for that query."
-          }
-        />
-        {partial.length > 0 && (
-          <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-            Some sources did not answer: {partial.join(", ")}.
-          </p>
-        )}
-      </div>
+        }
+      />
     )
   }
 
@@ -415,12 +425,6 @@ export function Result({ data, partial }: ResultProps) {
           </Section>
         </>
       )}
-
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sources did not answer: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }
@@ -465,6 +469,24 @@ type RobloxScrapeData = {
   capped: boolean
 }
 
+/**
+ * The bulk scan's answer.
+ *
+ * `matched` and `entries.length` are two different numbers and used to sit
+ * under near-identical labels. `matched` counts the LIVE accounts that passed
+ * the filters; `entries` is every row returned, which also includes the deleted
+ * IDs when "Include deleted accounts" was on. Labelling both "match" made a
+ * scan of 400 deleted IDs read as 400 matches next to a count of 0.
+ *
+ * `capped` is also narrower than it looks: the server sets it only when the
+ * requested amount exceeded its 25,000-ID scan cap. Two other stops (a 95s
+ * wall-clock budget and a 10,000-row result cap, both inside
+ * `scrapeRobloxProfiles`) truncate a run and report nothing at all, so a scan
+ * that covered 40% of the range comes back looking complete. There is no flag
+ * to read for those, and inventing one here would be a claim of our own, so
+ * this says in words that "IDs visited" is the only thing that can be trusted
+ * as the range actually covered.
+ */
 export function ScraperResult({ data, partial }: ResultProps) {
   const raw = withDefaults(data, {} as Partial<RobloxScrapeData>)
   const d: RobloxScrapeData = {
@@ -474,27 +496,50 @@ export function ScraperResult({ data, partial }: ResultProps) {
     capped: raw.capped === true,
   }
 
+  // The scan threw or blew its outer budget. Its counts are all zero, and
+  // rendering those as a result would report a failed run as an empty range.
+  const scanFailed = partial.includes("scrape")
+
   return (
     <div className="space-y-4">
       <Section title="Scan">
-        <FieldGrid
-          fields={[
-            { label: "Scanned", value: d.scanned > 0 ? d.scanned.toLocaleString() : "" },
-            { label: "Matched", value: d.matched > 0 ? d.matched.toLocaleString() : "0" },
-          ]}
-        />
-        {/* A truncated scan reads as a complete one unless we say otherwise. */}
-        {d.capped && (
-          <p className="mt-3 text-[12px] text-[var(--color-muted-foreground)]">
-            This scan hit the server's scan cap, so it was truncated. Some accounts in the requested
-            range were not visited.
-          </p>
+        {scanFailed ? (
+          <EmptyState message="This scan did not complete, so there are no counts to report. That is not a finding that the range holds no accounts." />
+        ) : (
+          <>
+            <FieldGrid
+              fields={[
+                { label: "IDs visited", value: d.scanned > 0 ? d.scanned.toLocaleString() : "" },
+                {
+                  label: "Live accounts matched",
+                  value: d.matched > 0 ? d.matched.toLocaleString() : "0",
+                },
+              ]}
+            />
+            {/* A truncated scan reads as a complete one unless we say otherwise. */}
+            {d.capped && (
+              <p className="mt-3 text-[12px] text-[var(--color-muted-foreground)]">
+                This scan hit the server's scan cap, so it was truncated. Some accounts in the
+                requested range were not visited.
+              </p>
+            )}
+            {/* The two truncation causes the server does NOT flag. Neither
+                comes back in the payload, so this is stated in words rather
+                than inferred into a marker of our own. */}
+            <p className="mt-3 text-[12px] text-[var(--color-muted-foreground)]">
+              A scan can also stop early on the server's time budget or its row limit, and neither
+              of those is reported back, so compare IDs visited against the amount you asked to scan
+              before treating this as a complete pass over the range.
+            </p>
+          </>
         )}
       </Section>
 
-      <Section title={`Matches${d.entries.length ? ` (${d.entries.length})` : ""}`}>
-        {d.entries.length === 0 ? (
-          <EmptyState message="No accounts matched the filters in the scanned range." />
+      <Section title={`Rows returned${d.entries.length ? ` (${d.entries.length})` : ""}`}>
+        {scanFailed ? (
+          <EmptyState message="The scan did not complete, so no accounts can be listed." />
+        ) : d.entries.length === 0 ? (
+          <EmptyState message="No accounts matched the filters in the IDs that were visited." />
         ) : (
           <ul className="space-y-2 text-[13px]">
             {d.entries.map((e, i) => (
@@ -533,12 +578,6 @@ export function ScraperResult({ data, partial }: ResultProps) {
           </ul>
         )}
       </Section>
-
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sources did not answer: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }

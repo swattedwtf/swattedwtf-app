@@ -116,9 +116,10 @@ export function outcomeAction(
     case "retry":
     case "error":
       return { label: "Retry", run: onRetry }
-    // A suspension is not something the user can act on from here, so it gets
-    // no button rather than a Retry that would fail identically. Nor is a dead
-    // session, which the app is already leaving for the login screen.
+    // Neither is something the user can act on from here, so both get no button
+    // rather than a Retry that would fail identically. A dead session is fixed
+    // by logging out and back in from Settings, which the panel says in words;
+    // there is nothing this screen can do about it on the user's behalf.
     case "suspended":
     case "auth":
       return null
@@ -126,11 +127,24 @@ export function outcomeAction(
 }
 
 /**
+ * What a dead session looks like on a module screen.
+ *
+ * The server's own copy for a 401 is "Not authenticated", which tells the user
+ * nothing they can act on, so this is the one branch where we write our own.
+ * Nothing here clears the session: only the overview path in app.tsx does that,
+ * and a screen that logged the user out from under a half-typed query would be
+ * a second bug rather than a fix for this one.
+ */
+const AUTH_MESSAGE =
+  "Your session has expired, so this lookup was refused. Open Settings, log out, and sign in again to continue."
+
+/**
  * What the app does about a refusal.
  *
- * The server's copy is shown verbatim in every branch. It is written for the
- * user, it is more specific than anything the client could invent, and it can
- * be reworded without a client release.
+ * The server's copy is shown verbatim in every branch but one. It is written
+ * for the user, it is more specific than anything the client could invent, and
+ * it can be reworded without a client release. The exception is `auth`, whose
+ * server copy is the bare string "Not authenticated".
  */
 export function OutcomePanel({
   outcome,
@@ -139,16 +153,18 @@ export function OutcomePanel({
   outcome: ClassifiedError
   onRetry: () => void
 }) {
-  // Nothing to say: a 401 has already sent the app back to the login screen,
-  // and a panel here would flash on the way out.
-  if (outcome.kind === "auth") return null
-
   const action = outcomeAction(outcome, onRetry)
 
   return (
     <div className="glass">
       <div className="glass-body">
-        <p className="max-w-[62ch] text-sm text-white/85">{outcome.message}</p>
+        {/* A 401 on a module lookup does NOT send the app back to login: only
+            the overview path in app.tsx clears a dead session. Rendering
+            nothing here left a blank panel and a session that stayed dead, so
+            this branch says what happened and what to do about it. */}
+        <p className="max-w-[62ch] text-sm text-white/85">
+          {outcome.kind === "auth" ? AUTH_MESSAGE : outcome.message}
+        </p>
         {action ? (
           <button type="button" onClick={action.run} className="btn-secondary btn-compact mt-4">
             {action.label}

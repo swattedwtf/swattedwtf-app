@@ -9,6 +9,22 @@ import { BadgeRow, EmptyState, FieldGrid, ProfileCard, Section } from "./ui"
  *
  * Two leaves, two answers, so two Results. The profile is the widest thing in
  * the group after Discord; the resolver answers one question about one link.
+ *
+ * TWO claims this screen is careful not to make.
+ *
+ *   1. `found: false` is not "this person has no Instagram". The server pushes
+ *      "lookup" into `partial` for every non-2xx that is not a 404, so a 502
+ *      from the provider arrives here looking exactly like a real not-found.
+ *      Only the absence of that marker licenses saying no account exists.
+ *   2. An empty section is not an empty account. The server names the sections
+ *      whose provider failed - about, posts, stories, highlights, tagged - and
+ *      each of those is branched on, because "No posts found." about a live
+ *      account whose post fetch failed is a false statement about a real
+ *      person.
+ *
+ * `partial` itself is NOT listed here. ResultView renders it once for every
+ * module, and a second list in this file's own vocabulary was the same fact
+ * told twice in two different words.
  */
 
 type Post = {
@@ -23,6 +39,22 @@ type Post = {
   commentCount: number
   viewCount: number
   location: string
+  mediaType: number
+}
+
+const EMPTY_POST: Post = {
+  id: "",
+  code: "",
+  url: null,
+  takenAt: "",
+  isVideo: false,
+  thumbnailUrl: null,
+  caption: "",
+  likeCount: 0,
+  commentCount: 0,
+  viewCount: 0,
+  location: "",
+  mediaType: 0,
 }
 
 type InstagramData = {
@@ -70,23 +102,74 @@ function OpenButton({ label, url }: { label: string; url: string | null }) {
   )
 }
 
+function count(n: number): string {
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n.toLocaleString() : ""
+}
+
+/**
+ * The posts and tagged-posts grid.
+ *
+ * The server normalises far more of a post than a thumbnail and a like count,
+ * and dropping the rest meant the user paid for a caption, a comment count and
+ * a location and was shown none of them. `url` has already been through the
+ * server's `toSafeLinkUrl`, so a null there means it was stripped and the cell
+ * stays a plain image rather than becoming a dead control.
+ */
 function PostGrid({ posts, empty }: { posts: Post[]; empty: string }) {
   if (posts.length === 0) return <EmptyState message={empty} />
   return (
     <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-      {posts.slice(0, 24).map((p) => (
-        <li key={p.id || p.code}>
+      {posts.slice(0, 24).map((raw, i) => {
+        const p = withDefaults(raw, EMPTY_POST)
+        const caption = typeof p.caption === "string" ? p.caption.trim() : ""
+        const meta = [
+          count(p.likeCount) ? `${count(p.likeCount)} likes` : "",
+          count(p.commentCount) ? `${count(p.commentCount)} comments` : "",
+          p.isVideo && count(p.viewCount) ? `${count(p.viewCount)} views` : "",
+          p.isVideo ? "Video" : "",
+          p.takenAt,
+        ]
+          .filter(Boolean)
+          .join("  ·  ")
+
+        const thumbnail = (
           <RemoteImage
             url={p.thumbnailUrl}
-            alt={p.caption ? p.caption.slice(0, 40) : "Post"}
+            alt={caption ? caption.slice(0, 40) : "Post"}
             name={p.code || "IG"}
             className="aspect-square w-full rounded-lg bg-white/5 text-[11px]"
           />
-          <span className="mt-1 block truncate text-[10px] text-[var(--color-muted-foreground)]">
-            {p.likeCount > 0 ? `${p.likeCount.toLocaleString()} likes` : p.takenAt}
-          </span>
-        </li>
-      ))}
+        )
+
+        return (
+          <li key={p.id || p.code || `post-${i}`} className="min-w-0">
+            {p.url ? (
+              <button
+                type="button"
+                onClick={() => void ipc.openExternal(p.url as string).catch(() => {})}
+                title={caption || undefined}
+                aria-label={caption ? `Open post: ${caption.slice(0, 80)}` : "Open post"}
+                className="block w-full"
+              >
+                {thumbnail}
+              </button>
+            ) : (
+              thumbnail
+            )}
+            {caption ? (
+              <span className="mt-1 block truncate text-[11px] text-white/75">{caption}</span>
+            ) : null}
+            <span className="mt-0.5 block truncate text-[10px] text-[var(--color-muted-foreground)]">
+              {meta || "No details reported"}
+            </span>
+            {p.location ? (
+              <span className="block truncate text-[10px] text-[var(--color-muted-foreground)]">
+                {p.location}
+              </span>
+            ) : null}
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -118,6 +201,7 @@ export function Result({ data, partial }: ResultProps) {
   })
   const d: InstagramData = {
     ...(raw as InstagramData),
+    query: typeof raw.query === "string" ? raw.query : "",
     profile: p,
     stats,
     about: { ...about, formerUsernames: list<string>(about.formerUsernames) },
@@ -128,11 +212,26 @@ export function Result({ data, partial }: ResultProps) {
     found: raw.found === true,
   }
 
+  const failed = (section: string) => partial.includes(section)
+  const subject = d.query ? `"${d.query}"` : "that query"
+
   if (!d.found) {
+    /**
+     * Two different empty answers, and they are not interchangeable.
+     *
+     * The server treats a 404 as a complete answer and everything else that is
+     * not a 2xx (429, 502, 503, 504, a timeout) as a failure named "lookup".
+     * Without that distinction a provider outage rendered as "this person has
+     * no Instagram", which is the sharpest false claim this screen can make.
+     */
     return (
-      <div className="space-y-4">
-        <EmptyState message={`No Instagram profile found for ${d.query || "that query"}.`} />
-      </div>
+      <EmptyState
+        message={
+          failed("lookup")
+            ? `The Instagram lookup for ${subject} did not complete, so we cannot say whether that account exists.`
+            : `No Instagram profile found for ${d.query || "that query"}.`
+        }
+      />
     )
   }
 
@@ -178,10 +277,11 @@ export function Result({ data, partial }: ResultProps) {
       </Section>
 
       <Section title="About this account">
-        {/* `retrieved: false` means the About panel could not be fetched at all.
-            Reporting that as "no former usernames" states something we did not
-            check, which is the same distinction the server is careful about. */}
-        {!d.about.retrieved ? (
+        {/* `retrieved: false` means the About panel could not be fetched at all,
+            and the server ALSO names "about" in `partial` when that section's
+            provider failed. Reporting either as "no former usernames" states
+            something we did not check. */}
+        {!d.about.retrieved || failed("about") ? (
           <EmptyState message="Instagram's About panel could not be retrieved for this account." />
         ) : (
           <FieldGrid
@@ -202,57 +302,81 @@ export function Result({ data, partial }: ResultProps) {
         )}
       </Section>
 
+      {/* Each of the four media sections is branched on its own name in
+          `partial`. A section whose provider failed says so; only a section
+          that was actually fetched is allowed to report that it is empty.
+          The three below Posts also RENDER when they failed, rather than
+          disappearing on a length check and taking the failure with them. */}
       <Section title={`Posts${d.posts.length ? ` (${d.posts.length})` : ""}`}>
         <PostGrid
           posts={d.posts}
-          empty={p.isPrivate ? "This account is private, so its posts are not visible." : "No posts found."}
+          empty={
+            failed("posts")
+              ? "Posts did not load for this account, so this is not a report that it has none."
+              : p.isPrivate
+                ? "This account is private, so its posts are not visible."
+                : "No posts found."
+          }
         />
       </Section>
 
-      {d.taggedPosts.length > 0 && (
-        <Section title={`Tagged (${d.taggedPosts.length})`}>
-          <PostGrid posts={d.taggedPosts} empty="No tagged posts." />
+      {(d.taggedPosts.length > 0 || failed("tagged")) && (
+        <Section title={`Tagged${d.taggedPosts.length ? ` (${d.taggedPosts.length})` : ""}`}>
+          <PostGrid
+            posts={d.taggedPosts}
+            empty={
+              failed("tagged")
+                ? "Tagged posts did not load for this account, so this is not a report that it has none."
+                : "No tagged posts."
+            }
+          />
         </Section>
       )}
 
-      {d.highlights.length > 0 && (
-        <Section title="Highlights">
-          <div className="flex flex-wrap gap-3">
-            {d.highlights.map((h) => (
-              <span key={h.id} className="w-20 text-center">
-                <RemoteImage
-                  url={h.coverUrl}
-                  alt={h.title}
-                  className="h-20 w-20 rounded-full bg-white/5"
-                />
-                <span className="mt-1 block truncate text-[10px] text-[var(--color-muted-foreground)]">
-                  {h.title}
+      {(d.highlights.length > 0 || failed("highlights")) && (
+        <Section title={`Highlights${d.highlights.length ? ` (${d.highlights.length})` : ""}`}>
+          {d.highlights.length === 0 ? (
+            <EmptyState message="Highlights did not load for this account, so this is not a report that it has none." />
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {d.highlights.map((h, i) => (
+                <span key={h.id || `highlight-${i}`} className="w-20 text-center">
+                  <RemoteImage
+                    url={h.coverUrl}
+                    alt={h.title || "Highlight"}
+                    name={h.title || "IG"}
+                    className="h-20 w-20 rounded-full bg-white/5 text-[11px]"
+                  />
+                  <span className="mt-1 block truncate text-[10px] text-white/75">
+                    {h.title || "Untitled"}
+                  </span>
+                  <span className="block truncate text-[10px] text-[var(--color-muted-foreground)]">
+                    {count(h.mediaCount) ? `${count(h.mediaCount)} items` : "Count not reported"}
+                  </span>
                 </span>
-              </span>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Section>
       )}
 
-      {d.stories.length > 0 && (
-        <Section title={`Active stories (${d.stories.length})`}>
-          <div className="flex flex-wrap gap-2">
-            {d.stories.map((s) => (
-              <RemoteImage
-                key={s.id}
-                url={s.thumbnailUrl}
-                alt="Story"
-                className="h-24 w-16 rounded-lg bg-white/5"
-              />
-            ))}
-          </div>
+      {(d.stories.length > 0 || failed("stories")) && (
+        <Section title={`Active stories${d.stories.length ? ` (${d.stories.length})` : ""}`}>
+          {d.stories.length === 0 ? (
+            <EmptyState message="Stories did not load for this account, so this is not a report that it has none." />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {d.stories.map((s, i) => (
+                <RemoteImage
+                  key={s.id || `story-${i}`}
+                  url={s.thumbnailUrl}
+                  alt="Story"
+                  className="h-24 w-16 rounded-lg bg-white/5"
+                />
+              ))}
+            </div>
+          )}
         </Section>
-      )}
-
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sections did not load: {partial.join(", ")}.
-        </p>
       )}
     </div>
   )
@@ -283,7 +407,7 @@ function countValue(n: number): string {
   return n.toLocaleString()
 }
 
-export function ShareResult({ data, partial }: ResultProps) {
+export function ShareResult({ data }: ResultProps) {
   const raw = withDefaults(data, {} as Partial<ShareData>)
   const d: ShareData = {
     ...(raw as ShareData),
@@ -355,12 +479,6 @@ export function ShareResult({ data, partial }: ResultProps) {
           ]}
         />
       </Section>
-
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sections did not load: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }

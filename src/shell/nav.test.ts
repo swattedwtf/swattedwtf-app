@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { MODULES } from "../modules/registry"
+import { BUILT_IN_ROUTES, MODULES } from "../modules/registry"
 import { ENABLED_ROUTES, NAV, flattenNav, isEnabled } from "./nav"
 
 describe("NAV", () => {
@@ -61,7 +61,7 @@ describe("isEnabled", () => {
     // Derived from the registry, not hand-listed. An earlier version spelled the
     // expected routes out and had to be edited every time a module shipped,
     // which tests the editor rather than the derivation.
-    expect(ENABLED_ROUTES).toEqual(["/dashboard", "/settings", ...MODULES.map((m) => m.route)])
+    expect(ENABLED_ROUTES).toEqual([...BUILT_IN_ROUTES, ...MODULES.map((m) => m.route)])
     expect(isEnabled("/dashboard")).toBe(true)
     expect(isEnabled("/settings")).toBe(true)
     for (const m of MODULES) expect(isEnabled(m.route), `${m.route} should be enabled`).toBe(true)
@@ -71,7 +71,7 @@ describe("isEnabled", () => {
     const live = new Set(MODULES.map((m) => m.route))
     const unbuilt = flattenNav()
       .map((i) => i.href)
-      .filter((h) => !live.has(h) && h !== "/dashboard" && h !== "/settings" && !h.startsWith("http"))
+      .filter((h) => !live.has(h) && !BUILT_IN_ROUTES.includes(h) && !h.startsWith("http"))
     // There are always some: the whole Tools group and the streaming screens are
     // out of scope for this pass.
     expect(unbuilt.length).toBeGreaterThan(0)
