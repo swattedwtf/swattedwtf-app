@@ -4,7 +4,7 @@
 //! inventory of everything the webview is allowed to do. Note what is absent:
 //! nothing here returns the session cookie, so the frontend has no path to it.
 
-use crate::api::{auth, client::ApiClient, overview};
+use crate::api::{auth, client::ApiClient, lookup as lookup_api, overview};
 use crate::captcha;
 use crate::error::AppError;
 use serde::Serialize;
@@ -56,6 +56,33 @@ pub async fn logout(state: State<'_, AppState>) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn get_overview(state: State<'_, AppState>) -> Result<overview::Overview, AppError> {
     overview::fetch(&state.client).await
+}
+
+/// Runs one lookup module and returns its normalised payload.
+///
+/// `module` is a key into a static table on the SERVER, never a URL or a path
+/// fragment, so there is no caller-supplied destination anywhere in this call.
+/// An unknown key is a 400 from the server, not a request to somewhere else.
+#[tauri::command]
+pub async fn lookup(
+    state: State<'_, AppState>,
+    module: String,
+    input: serde_json::Value,
+) -> Result<serde_json::Value, AppError> {
+    lookup_api::lookup(&state.client, &module, input).await
+}
+
+/// Fetches an image and hands the webview a `data:` URL.
+///
+/// The webview cannot load a remote image at all (its CSP is
+/// `img-src 'self' data:`) and our image proxy needs the session cookie, which
+/// only this side holds. Restricted to our own origin: this command carries the
+/// session cookie, so accepting an arbitrary host would let anything running in
+/// the webview make authenticated requests wherever it liked and read the
+/// answer back as base64.
+#[tauri::command]
+pub async fn fetch_image(state: State<'_, AppState>, url: String) -> Result<String, AppError> {
+    lookup_api::fetch_image(&state.client, &url).await
 }
 
 /// Public half of the release key that signs integrity.json, baked in at

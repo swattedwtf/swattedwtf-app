@@ -88,20 +88,70 @@ impl ApiClient {
 
     /// Reads a response, mapping a non-2xx into AppError::Api carrying the
     /// server's own `error` string so the UI can show it verbatim (rate limits,
-    /// "Invalid login code", and so on).
+    /// "Invalid login code", and so on), plus its machine-readable `code`.
+    ///
+    /// The body is parsed by `lookup::error_from` rather than here, so there is
+    /// exactly one definition of a server error body in the client.
     async fn read<T: DeserializeOwned>(resp: reqwest::Response) -> Result<T, AppError> {
         let status = resp.status();
         let body = resp.text().await.map_err(|e| AppError::Network(e.to_string()))?;
 
         if !status.is_success() {
-            let message = serde_json::from_str::<serde_json::Value>(&body)
-                .ok()
-                .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_owned))
-                .unwrap_or_else(|| format!("Request failed ({})", status.as_u16()));
-            return Err(AppError::Api { status: status.as_u16(), message });
+            return Err(crate::api::lookup::error_from(status.as_u16(), &body));
         }
 
         serde_json::from_str::<T>(&body).map_err(|e| AppError::Internal(e.to_string()))
+    }
+
+    /// GETs an ABSOLUTE url, returning its content type and body.
+    ///
+    /// Absolute rather than a path, because the caller passes a URL the server
+    /// minted inside a payload. That makes the destination caller-supplied, so
+    /// every caller must prove the URL is ours first: `lookup::fetch_image`
+    /// does that with `is_api_origin` before calling this.
+    ///
+    /// The body is accumulated chunk by chunk against `max_bytes`, so an
+    /// oversized or endless response is dropped mid-flight rather than after it
+    /// has already been held in memory. The declared length is checked first
+    /// where it exists, which avoids downloading it at all.
+    pub async fn get_bytes(
+        &self,
+        url: &str,
+        max_bytes: usize,
+    ) -> Result<(String, Vec<u8>), AppError> {
+        let mut resp = self
+            .http
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| AppError::Network(e.to_string()))?;
+
+        let status = resp.status();
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(crate::api::lookup::error_from(status.as_u16(), &body));
+        }
+
+        if resp.content_length().is_some_and(|len| len > max_bytes as u64) {
+            return Err(AppError::Internal("image too large".into()));
+        }
+
+        let mut out: Vec<u8> = Vec::new();
+        while let Some(chunk) = resp.chunk().await.map_err(|e| AppError::Network(e.to_string()))? {
+            if out.len() + chunk.len() > max_bytes {
+                return Err(AppError::Internal("image too large".into()));
+            }
+            out.extend_from_slice(&chunk);
+        }
+
+        Ok((content_type, out))
     }
 
     pub async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, AppError> {

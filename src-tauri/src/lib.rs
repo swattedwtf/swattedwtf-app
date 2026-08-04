@@ -106,6 +106,8 @@ pub fn run() {
             commands::register,
             commands::logout,
             commands::get_overview,
+            commands::lookup,
+            commands::fetch_image,
         ])
         // Closing the main window must end the process.
         //

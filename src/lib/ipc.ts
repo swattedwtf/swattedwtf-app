@@ -9,7 +9,19 @@ export type Overview = {
   user: { id: string; userNumber: number; email: string | null; handle: string }
   telegram: { username: string | null; linked: boolean }
   security: { twofaEnabled: boolean }
-  plan: { id: string; label: string; monthlyLimit: number; since: string }
+  plan: {
+    id: string
+    label: string
+    monthlyLimit: number
+    since: string
+    /** Wallet balance in cents. Zero, never undefined, when the row has none. */
+    balanceCents: number
+    /** Shown verbatim. Empty means the server did not report one, which is not
+     *  the same as inactive, so do not render it as a status of its own. */
+    status: string
+    /** Lookups per day. Null means no limit is set, which is not zero. */
+    dailyLimit: number | null
+  }
   usage: {
     todayCount: number
     monthCount: number
@@ -25,6 +37,25 @@ export type Overview = {
     expiresAt: string | null
     key: string | null
   }
+}
+
+/**
+ * What one module lookup answers with.
+ *
+ * `data` is deliberately untyped here. The server normalises each module into
+ * its own documented shape and that shape is additive only, so a module's own
+ * renderer is the right place to describe it: typing it centrally would mean
+ * touching this file every time any of sixteen modules gained a field.
+ *
+ * `schema` is bumped only by a genuinely breaking change, so a client older
+ * than the server can say "update the app" instead of drawing a half-empty
+ * screen. `partial` names the sections whose provider failed or timed out;
+ * it is never fatal, and an empty list is the normal case.
+ */
+export type LookupResult = {
+  schema: number
+  data: Record<string, unknown>
+  partial: string[]
 }
 
 export type LoginOutcome =
@@ -58,4 +89,22 @@ export const ipc = {
   windowDiagnostics: () => invoke<WindowDiagnostics>("window_diagnostics"),
   hideQuick: () => invoke<void>("hide_quick"),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
+
+  /**
+   * Runs one lookup module. `module` is a key into a static table on the
+   * server, never a path or a host, and the server runs the module's whole
+   * provider fan-out, so this is one call however many upstreams it takes.
+   */
+  lookup: (module: string, input: Record<string, unknown>) =>
+    invoke<LookupResult>("lookup", { module, input }),
+
+  /**
+   * Resolves an image URL from a lookup payload into a `data:` URL.
+   *
+   * Needed because the webview's CSP is `img-src 'self' data:`, so no remote
+   * image renders directly, and our image proxy needs the session cookie, which
+   * only Rust holds. Rust accepts our own origin and nothing else, so a
+   * rejected URL here is a bug in the payload, not something to work around.
+   */
+  fetchImage: (url: string) => invoke<string>("fetch_image", { url }),
 }
