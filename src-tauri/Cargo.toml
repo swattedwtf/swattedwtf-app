@@ -1,6 +1,6 @@
 [package]
 name = "swattedwtf-app"
-version = "0.1.9"
+version = "0.1.10"
 description = "Open-source desktop client for swatted.wtf"
 authors = ["swatted.wtf"]
 license = "MIT"
