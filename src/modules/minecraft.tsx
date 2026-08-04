@@ -64,7 +64,9 @@ export function Result({ data, partial }: ResultProps) {
       : null,
     discord: raw.discord ? withDefaults(raw.discord, { id: "", username: "", avatarUrl: null }) : null,
   }
-  const p = d.profile ? { ...d.profile, nameHistory: list(d.profile.nameHistory) } : null
+  const p = d.profile
+    ? { ...d.profile, nameHistory: list<{ username: string; changedAt: string | null }>(d.profile.nameHistory) }
+    : null
 
   return (
     <div className="space-y-4">
