@@ -31,3 +31,19 @@ export function withDefaults<T extends object>(data: unknown, defaults: T): T {
 export function list<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
 }
+
+/**
+ * Like `list`, but for arrays of OBJECTS whose fields are read in render.
+ *
+ * `list` guarantees the outer array, not the shape of each element. A row that
+ * arrives as `null` or a scalar reaches the render, where `row.field` throws on
+ * the null and `row.field.join(...)` throws on the scalar, and a throw in this
+ * app's render is an unrecoverable white window. This keeps only the elements
+ * that are real objects, so a field read on any survivor is at worst
+ * `undefined`, never a crash. A dropped row was never renderable anyway.
+ */
+export function rows<T extends object>(value: unknown): T[] {
+  return list<unknown>(value).filter(
+    (el): el is T => typeof el === "object" && el !== null && !Array.isArray(el),
+  )
+}

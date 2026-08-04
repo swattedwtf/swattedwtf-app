@@ -832,6 +832,16 @@ type AddressData = {
    * reachable here.
    */
   mapImageUrl: string | null
+  /**
+   * Where the map's centre came from. "provider" means the record carried
+   * coordinates; "geocoded" means they were derived from the address that was
+   * searched for, which answers "where is that address" rather than "where does
+   * the record place the subject". The caption says which, because quietly
+   * presenting one as the other is the kind of thing an investigation acts on.
+   */
+  mapSource: "provider" | "geocoded" | null
+  /** The point actually drawn. Not always latLong, see mapSource. */
+  mapCenter: { latitude: number; longitude: number } | null
   currentResidents: AddressPerson[]
   owners: AddressPerson[]
 }
@@ -872,25 +882,44 @@ function preciseCoords(ll: LatLong | null): string {
  * picture, and a way to get to a real map. The button hands the coordinates to
  * the user's own browser rather than pretending the still is interactive.
  */
-function AddressMapSection({ url, place, ll }: { url: string | null; place: string; ll: LatLong }) {
+function AddressMapSection({
+  url,
+  place,
+  ll,
+  center,
+  source,
+}: {
+  url: string | null
+  place: string
+  /** The provider's coordinates, or null when it sent none. */
+  ll: LatLong | null
+  center: { latitude: number; longitude: number } | null
+  source: "provider" | "geocoded" | null
+}) {
+  // The provider's own coordinates when it sent them, else the point the map is
+  // actually centred on. Without this the external link opened 0,0 for every
+  // geocoded result, which looks like a working button and is not one.
   const at = preciseCoords(ll)
+  const target = ll ?? center
   return (
     <Section
       title="Map"
       action={
+        !target ? null : (
         <button
           type="button"
           className="btn-secondary btn-compact"
           onClick={() => {
             void ipc
               .openExternal(
-                `https://www.google.com/maps/search/?api=1&query=${ll.latitude},${ll.longitude}`,
+                `https://www.google.com/maps/search/?api=1&query=${target?.latitude},${target?.longitude}`,
               )
               .catch(() => {})
           }}
         >
           Open in a map
         </button>
+        )
       }
     >
       {url ? (
@@ -907,7 +936,13 @@ function AddressMapSection({ url, place, ll }: { url: string | null; place: stri
       )}
       {at ? (
         <p className="mt-3 font-mono text-[11px] text-white/70">
-          {ll.accuracy ? `${at}  ${ll.accuracy}` : at}
+          {ll?.accuracy ? `${at}  ${ll.accuracy}` : at}
+        </p>
+      ) : null}
+      {source === "geocoded" ? (
+        <p className="mt-2 text-[12px] text-[var(--color-muted-foreground)]">
+          Approximate location of the address you searched for. The records below did not include
+          their own coordinates.
         </p>
       ) : null}
     </Section>
@@ -1118,6 +1153,15 @@ export function AddressInsightsResult({ data }: ResultProps) {
     totalValue: nullableText(raw.totalValue),
     lastSaleDate: nullableText(raw.lastSaleDate),
     mapImageUrl: nullableText(raw.mapImageUrl),
+    mapSource:
+      raw.mapSource === "provider" || raw.mapSource === "geocoded" ? raw.mapSource : null,
+    mapCenter: (() => {
+      if (!raw.mapCenter || typeof raw.mapCenter !== "object") return null
+      const c = withDefaults(raw.mapCenter, { latitude: NaN, longitude: NaN })
+      return Number.isFinite(c.latitude) && Number.isFinite(c.longitude)
+        ? { latitude: c.latitude, longitude: c.longitude }
+        : null
+    })(),
     // A coordinate pair is only carried when both halves are real numbers: a
     // defaulted 0, 0 is a spot in the Atlantic, not a missing value.
     latLong: (() => {
@@ -1184,8 +1228,14 @@ export function AddressInsightsResult({ data }: ResultProps) {
 
       {/* Only when the provider actually placed the address. A map section with
           nothing in it says less than no map section at all. */}
-      {d.latLong ? (
-        <AddressMapSection url={d.mapImageUrl} place={[street, place].filter(Boolean).join(", ")} ll={d.latLong} />
+      {d.mapImageUrl || d.latLong ? (
+        <AddressMapSection
+          url={d.mapImageUrl}
+          place={[street, place].filter(Boolean).join(", ")}
+          ll={d.latLong}
+          center={d.mapCenter}
+          source={d.mapSource}
+        />
       ) : null}
 
       <Section title="Property">

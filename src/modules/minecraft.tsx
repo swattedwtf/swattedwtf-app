@@ -1,6 +1,6 @@
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
-import { list, withDefaults } from "./safe"
+import { rows, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
 import { EmptyState, FieldGrid, ProfileCard, Section } from "./ui"
 
@@ -48,9 +48,9 @@ export function Result({ data }: ResultProps) {
   const d: MinecraftData = {
     ...(raw as MinecraftData),
     queryType: typeof raw.queryType === "string" ? raw.queryType : "username",
-    avatars: list(raw.avatars),
-    socials: list(raw.socials),
-    breaches: list(raw.breaches),
+    avatars: rows(raw.avatars),
+    socials: rows(raw.socials),
+    breaches: rows(raw.breaches),
     breachCount: typeof raw.breachCount === "number" ? raw.breachCount : 0,
     profile: raw.profile
       ? withDefaults(raw.profile, {
@@ -65,7 +65,7 @@ export function Result({ data }: ResultProps) {
     discord: raw.discord ? withDefaults(raw.discord, { id: "", username: "", avatarUrl: null }) : null,
   }
   const p = d.profile
-    ? { ...d.profile, nameHistory: list<{ username: string; changedAt: string | null }>(d.profile.nameHistory) }
+    ? { ...d.profile, nameHistory: rows<{ username: string; changedAt: string | null }>(d.profile.nameHistory) }
     : null
 
   return (

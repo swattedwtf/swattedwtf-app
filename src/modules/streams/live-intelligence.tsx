@@ -1,25 +1,52 @@
+import type { CSSProperties } from "react"
+
 import { ipc } from "../../lib/ipc"
 import { list } from "../safe"
-import { EmptyState, FieldGrid, ProfileCard, Section, type Field } from "../ui"
+import { BadgeRow, EmptyState, ProfileCard, Section, type Badge, type Field } from "../ui"
 import type { StreamFrame, StreamModuleDescriptor, StreamResultProps } from "../stream-types"
 
 /**
- * Live Intelligence: the Heist email sweep, cards streamed as each source
- * resolves.
+ * Live Intelligence: the Heist account-enumeration sweep, cards streamed as each
+ * source resolves. Two tabs, mirroring the web page:
  *
- * Drives the server's `live-intelligence` stream module, which runs the exact
- * fan-out the web page runs and emits `{t:"start"}`, `{t:"progress", card}`,
- * `{t:"done"}` frames. A card is a hit; a `card:null` progress frame is a
- * checked-but-no-hit source, which advances the counter but renders nothing.
- * Only hits are drawn, so a source that failed inside the sweep never appears as
- * a source that "found nothing".
+ *  - Email drives the server's `live-intelligence` stream module (email sweep).
+ *  - Phone drives the `phone-intelligence` module (phone sweep).
  *
- * The server has already rewritten every card's avatar onto our image proxy and
- * every viewUrl through the link sanitiser, so avatars go through RemoteImage
- * (inside ProfileCard) and the "View profile" button opens the link externally.
+ * Both emit the identical `{t:"start"}`, `{t:"progress", card}`, `{t:"done"}`
+ * frame shape, so one Result renders either. A card is a hit; a `card:null`
+ * progress frame is a checked-but-no-hit source, which advances the counter but
+ * renders nothing. Only hits are drawn, so a source that FAILED inside the sweep
+ * never appears as a source that "found nothing".
+ *
+ * Existence-only hits (a provider that merely confirmed an account is
+ * registered, no profile/recovery/id) collapse into one "Registered services"
+ * summary, exactly as the web does; the richer providers each keep their own
+ * card. The server has already rewritten every card's avatar onto our image
+ * proxy and every viewUrl through the link sanitiser, so avatars go through
+ * RemoteImage (inside ProfileCard) and "View profile" opens the link externally.
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Advisory only. The server's normalizePhone is the authority; this just keeps
+// an obviously-not-a-phone value from becoming a metered request, and produces
+// the same E.164 the server would so the sent value matches its metering form.
+const E164_RE = /^\+[1-9]\d{6,14}$/
+
+/** Client-side E.164 canonicalisation, mirroring lib/phone-validation on the
+ *  server, so the value the client sends is the same one the server meters on. */
+function normalizePhone(value: string): string | null {
+  let s = value.trim()
+  if (!s) return null
+  // `00` is the international call prefix in much of the world; treat it as `+`.
+  if (s.startsWith("00")) s = "+" + s.slice(2)
+  const hadPlus = s.startsWith("+")
+  const digits = s.replace(/\D/g, "")
+  // Require an explicit international form: without a country code we would be
+  // guessing, which produces wrong lookups. Refuse rather than guess.
+  if (!digits || !hadPlus) return null
+  const e164 = "+" + digits
+  return E164_RE.test(e164) ? e164 : null
+}
 
 type IntelField = { label?: unknown; value?: unknown }
 type IntelCard = {
@@ -30,6 +57,7 @@ type IntelCard = {
   avatar?: unknown
   viewUrl?: unknown
   fields?: unknown
+  existenceOnly?: unknown
 }
 
 function text(value: unknown): string {
@@ -74,6 +102,8 @@ function progress(frames: StreamFrame[]): { checked: number; total: number; hits
   return { checked, total, hits }
 }
 
+/** One rich provider card: avatar/name/handle over its labelled fields, with an
+ *  external "View profile" link when the server sanitised one through. */
 function CardView({ card }: { card: IntelCard }) {
   const provider = text(card.provider) || "Account"
   const title = text(card.title) || provider
@@ -103,39 +133,102 @@ function CardView({ card }: { card: IntelCard }) {
   )
 }
 
+/**
+ * The collapsed summary of existence-only hits, mirroring the web's "Registered
+ * Services" card: a count and a row of provider-name pills. Built on BadgeRow so
+ * it matches every other pill row in the app.
+ */
+function RegisteredServices({ providers }: { providers: string[] }) {
+  const badges: Badge[] = providers
+    .map((p) => ({ label: p }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  return (
+    <Section title={`Registered services · ${providers.length} account${providers.length === 1 ? "" : "s"}`}>
+      <BadgeRow badges={badges} />
+    </Section>
+  )
+}
+
+/** Copy for the empty state, keeping a failed sweep distinct from a clean miss. */
+function emptyMessage(status: StreamResultProps["status"]): string {
+  if (status === "streaming") {
+    return "Checking sources for accounts tied to this identifier. Results appear as each source answers."
+  }
+  if (status === "cancelled") return "Sweep cancelled before any accounts were surfaced."
+  if (status === "error") return "The sweep stopped before finishing. Retry to run it again."
+  return "No accounts surfaced for this lookup."
+}
+
 function LiveIntelResult({ frames, status }: StreamResultProps) {
   const hitCards = cards(frames)
   const { checked, total, hits } = progress(frames)
+  const streaming = status === "streaming"
 
-  const summary: Field[] = [
-    { label: "Sources checked", value: total > 0 ? `${checked} of ${total}` : String(checked) },
-    { label: "Accounts found", value: String(hits) },
-  ]
+  // Existence-only hits collapse into one summary; richer providers each keep
+  // their own card, exactly as the web page splits them.
+  const existenceOnly = hitCards.filter((c) => c.existenceOnly === true)
+  const richCards = hitCards.filter((c) => c.existenceOnly !== true)
+  const providerNames = existenceOnly.map((c) => text(c.provider) || text(c.key) || "Account")
 
   return (
-    <div className="space-y-4">
-      <Section title={status === "streaming" ? "Enumerating accounts" : "Sweep summary"}>
-        <FieldGrid fields={summary} />
-      </Section>
+    <div className="fade-in space-y-4">
+      {/* Summary bar: accounts found and sources checked, with a live dot while
+          sources are still answering. Matches the web page's summary line. */}
+      <div className="glass-tile flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-[13px]">
+        <span className="text-white/70">
+          <span className="font-semibold text-white">{hits}</span> account
+          {hits === 1 ? "" : "s"} found
+        </span>
+        <span className="text-white/30" aria-hidden="true">
+          ·
+        </span>
+        <span className="text-white/70">
+          <span className="tabular-nums text-white">{checked}</span>
+          {total > 0 ? ` of ${total}` : ""} sources checked
+        </span>
+        {streaming ? (
+          <span className="ml-auto inline-flex items-center gap-2 text-white/70">
+            <span
+              className="live-dot h-2 w-2 shrink-0 rounded-full bg-[var(--color-positive)]"
+              aria-hidden="true"
+            />
+            scanning
+          </span>
+        ) : null}
+      </div>
 
-      {hitCards.length === 0 ? (
-        <EmptyState
-          message={
-            status === "streaming"
-              ? "Checking sources for accounts tied to this email. Results appear as each source answers."
-              : status === "cancelled"
-                ? "Sweep cancelled before any accounts were surfaced."
-                : status === "error"
-                  ? "The sweep stopped before finishing. Retry to run it again."
-                  : "No accounts surfaced for this email."
-          }
-        />
-      ) : (
-        hitCards.map((card, i) => <CardView key={text(card.key) || `card-${i}`} card={card} />)
-      )}
+      {existenceOnly.length > 0 ? <RegisteredServices providers={providerNames} /> : null}
+
+      {richCards.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {richCards.map((card, i) => (
+            <div
+              key={text(card.key) || `card-${i}`}
+              className="stagger-item"
+              style={{ "--i": i } as CSSProperties}
+            >
+              <CardView card={card} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Nothing has arrived yet but the sweep is running: skeletons rather than
+          an empty panel, so the screen reads as working, not broken. */}
+      {streaming && hitCards.length === 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton h-40" />
+          ))}
+        </div>
+      ) : null}
+
+      {/* Distinct from the skeletons above: an explicit empty/failed/cancelled
+          state once the sweep is no longer producing. */}
+      {!streaming && hitCards.length === 0 ? <EmptyState message={emptyMessage(status)} /> : null}
 
       {status === "cancelled" && hitCards.length > 0 ? (
-        <p className="text-[12px] text-[var(--color-muted-foreground)]">
+        <p className="text-[12px] text-white/60">
           Cancelled. Showing the accounts found before you stopped.
         </p>
       ) : null}
@@ -147,16 +240,38 @@ export const liveIntelligenceDescriptor: StreamModuleDescriptor = {
   id: "live-intelligence",
   route: "/live-intelligence",
   label: "Live Intelligence",
+  // The two tabs, mirroring the web page. The mode toggle picks which sweep the
+  // server runs; each is metered as its own web route through its own module.
+  modes: [
+    { id: "email", label: "Email" },
+    { id: "phone", label: "Phone" },
+  ],
   inputs: [
     {
-      name: "email",
-      label: "Email",
-      placeholder: "target@example.com",
-      validate: (v) => (EMAIL_RE.test(v.trim()) ? null : "Enter a valid email address."),
+      name: "query",
+      label: "Email or phone",
+      placeholder: "target@example.com or +49 176 84100605",
+      // Non-empty only here; the mode-specific check lives in resolve, since a
+      // field validator cannot see which tab is selected.
+      validate: (v) => (v.trim() ? null : "Enter an email or phone number."),
     },
   ],
-  resolve: (values) => {
-    const email = (values.email ?? "").trim().toLowerCase()
+  resolve: (values, mode) => {
+    const raw = (values.query ?? "").trim()
+    if (!raw) return { error: "Enter an email or phone number." }
+
+    if (mode === "phone") {
+      const e164 = normalizePhone(raw)
+      if (!e164) {
+        return {
+          error: "Enter a valid phone number in international format (e.g. +49 176 84100605).",
+        }
+      }
+      return { module: "phone-intelligence", input: { phone: e164 } }
+    }
+
+    // Email is the default tab.
+    const email = raw.toLowerCase()
     if (!EMAIL_RE.test(email)) return { error: "Enter a valid email address." }
     return { module: "live-intelligence", input: { email } }
   },

@@ -14,16 +14,20 @@ vi.mock("../../lib/ipc", () => ({
   startStream: vi.fn(),
 }))
 
-/** Render a descriptor's Result to static HTML for assertion. */
+/**
+ * Render a descriptor's Result to static HTML for assertion. Rendered as an
+ * ELEMENT, not called as a plain function, because a Result may hold state (the
+ * Search result carries filter and investigation tabs), and that is exactly how
+ * StreamScreen mounts it.
+ */
 function renderResult(
   descriptor: { Result: (p: StreamResultProps) => unknown },
   frames: StreamFrame[],
   status: StreamResultProps["status"],
   error: string | null = null,
 ): string {
-  return renderToStaticMarkup(
-    (descriptor.Result as (p: StreamResultProps) => ReactElement)({ frames, status, error }),
-  )
+  const Result = descriptor.Result as (p: StreamResultProps) => ReactElement
+  return renderToStaticMarkup(<Result frames={frames} status={status} error={error} />)
 }
 
 describe("stream registry and nav stay in sync", () => {
@@ -67,10 +71,15 @@ describe("StreamScreen renders each descriptor's form at rest", () => {
     expect(html).not.toContain("Sweep summary")
   })
 
-  it("draws the Live Intelligence form with no mode toggle", () => {
+  it("draws the Live Intelligence form with its Email and Phone tabs", () => {
     const html = renderToStaticMarkup(<StreamScreen descriptor={liveIntelligenceDescriptor} />)
     expect(html).toContain("Live Intelligence")
+    // The two tabs, mirroring the web page.
+    expect(html).toContain("Email")
+    expect(html).toContain("Phone")
     expect(html).toContain("target@example.com")
+    // Nothing has run, so no result body yet.
+    expect(html).not.toContain("Sweep summary")
   })
 })
 
@@ -101,16 +110,37 @@ describe("Search resolve picks the right metered module per mode", () => {
   })
 })
 
-describe("Live Intelligence resolve", () => {
-  it("lowercases and routes a valid email to the live-intelligence module", () => {
-    expect(liveIntelligenceDescriptor.resolve({ email: "Victim@Example.com" }, null)).toEqual({
+describe("Live Intelligence resolve picks the right sweep per tab", () => {
+  it("lowercases and routes a valid email to the live-intelligence module (default tab)", () => {
+    expect(liveIntelligenceDescriptor.resolve({ query: "Victim@Example.com" }, "email")).toEqual({
+      module: "live-intelligence",
+      input: { email: "victim@example.com" },
+    })
+    // A null mode falls back to the email tab, the default.
+    expect(liveIntelligenceDescriptor.resolve({ query: "Victim@Example.com" }, null)).toEqual({
       module: "live-intelligence",
       input: { email: "victim@example.com" },
     })
   })
 
-  it("rejects a non-email before any request", () => {
-    expect(liveIntelligenceDescriptor.resolve({ email: "nope" }, null)).toHaveProperty("error")
+  it("canonicalises a phone to E.164 and routes it to the phone-intelligence module", () => {
+    // Several free-form shapes, all of which the server's normalizePhone accepts,
+    // collapse to the identical E.164 the server meters on.
+    for (const raw of ["+49 176 84100605", "0049-176-84100605", "+4917684100605"]) {
+      expect(liveIntelligenceDescriptor.resolve({ query: raw }, "phone")).toEqual({
+        module: "phone-intelligence",
+        input: { phone: "+4917684100605" },
+      })
+    }
+  })
+
+  it("rejects a bad value for the selected tab before any request", () => {
+    expect(liveIntelligenceDescriptor.resolve({ query: "nope" }, "email")).toHaveProperty("error")
+    // A bare national number has no country context; the phone tab refuses it.
+    expect(liveIntelligenceDescriptor.resolve({ query: "17684100605" }, "phone")).toHaveProperty(
+      "error",
+    )
+    expect(liveIntelligenceDescriptor.resolve({ query: "" }, "phone")).toHaveProperty("error")
   })
 })
 
@@ -203,5 +233,164 @@ describe("LiveIntelResult renders only hits and coerces safely", () => {
         "done",
       ),
     ).not.toThrow()
+  })
+
+  it("collapses existence-only hits into the registered-services summary, richer ones stay cards", () => {
+    const mixed: StreamFrame[] = [
+      { t: "start", total: 3 },
+      {
+        t: "progress",
+        checked: 1,
+        total: 3,
+        hits: 1,
+        card: { key: "netflix", provider: "Netflix", existenceOnly: true, fields: [] },
+      },
+      {
+        t: "progress",
+        checked: 2,
+        total: 3,
+        hits: 2,
+        card: { key: "spotify", provider: "Spotify", title: "Jane", fields: [{ label: "Plan", value: "Premium" }] },
+      },
+      { t: "done", stats: { checked: 3, total: 3, hits: 2 } },
+    ]
+    const html = renderResult(liveIntelligenceDescriptor, mixed, "done")
+    // Existence-only Netflix is a pill under the registered-services summary.
+    expect(html).toContain("Registered services")
+    expect(html).toContain("Netflix")
+    // Spotify carried profile detail, so it keeps its own card.
+    expect(html).toContain("Spotify")
+    expect(html).toContain("Premium")
+  })
+})
+
+describe("Search folds in the enrichment frames the web fans out to", () => {
+  // One breach record so the base result renders; each test adds the enrichment
+  // frame under test beside it.
+  const recordFrame: StreamFrame = {
+    t: "progress",
+    checked: 1,
+    total: 1,
+    hits: 1,
+    records: [
+      {
+        id: "1",
+        source: "LeakDB",
+        fields: [
+          { label: "EMAIL", value: "a@b.co", sensitive: false },
+          { label: "PASSWORD", value: "hunter2", sensitive: true },
+        ],
+      },
+    ],
+  }
+
+  const investigationFrame: StreamFrame = {
+    t: "investigation",
+    data: {
+      query: "a@b.co",
+      credentials: {
+        items: [{ domain: "example.com", username: "bob", password: "s3cret", source_type: "combo" }],
+        total: 1,
+      },
+      victims: { items: [], total: 0 },
+      evidence: { items: [], total: 0 },
+      files: { items: [], total: 0 },
+      relatedCredentials: { items: [], total: 0 },
+    },
+  }
+
+  const hudsonFrame: StreamFrame = {
+    t: "hudsonrock",
+    infections: [
+      {
+        id: "h1",
+        stealerFamily: "RedLine",
+        dateCompromised: "2024-01-02",
+        computerName: "VICTIM-PC",
+        credentialsCount: 5,
+        clientCount: 2,
+        antiviruses: ["Defender"],
+      },
+    ],
+  }
+
+  const domainFrame: StreamFrame = {
+    t: "domain-intel",
+    data: {
+      domain: "evil-domain.test",
+      riskScore: 82,
+      riskLevel: "high",
+      riskFactors: [{ name: "young_domain", score: 8, maxScore: 10, detail: "registered recently" }],
+      subdomains: ["mail.evil-domain.test"],
+      thcRecords: [],
+      endpoints: [],
+      whois: { registrar: "TestRegistrar" },
+    },
+  }
+
+  it("renders the unified investigation, its default tab reading from the frame", () => {
+    const html = renderResult(searchDescriptor, [recordFrame, investigationFrame, { t: "done", stats: {} }], "done")
+    const cred = (investigationFrame.data as { credentials: { items: { password: string; domain: string }[] } })
+      .credentials.items[0]
+    expect(html).toContain("Full investigation")
+    // The credentials tab is the default, so its row's values are on screen.
+    expect(html).toContain(cred.password)
+    expect(html).toContain(cred.domain)
+  })
+
+  it("does not render an investigation section when every section is empty", () => {
+    const emptyInv: StreamFrame = {
+      t: "investigation",
+      data: {
+        query: "a@b.co",
+        credentials: { items: [], total: 0 },
+        victims: { items: [], total: 0 },
+        evidence: { items: [], total: 0 },
+        files: { items: [], total: 0 },
+        relatedCredentials: { items: [], total: 0 },
+      },
+    }
+    const html = renderResult(searchDescriptor, [recordFrame, emptyInv, { t: "done", stats: {} }], "done")
+    expect(html).not.toContain("Full investigation")
+  })
+
+  it("renders Hudson Rock machines from the hudsonrock frame", () => {
+    const html = renderResult(searchDescriptor, [recordFrame, hudsonFrame, { t: "done", stats: {} }], "done")
+    const inf = (hudsonFrame.infections as { stealerFamily: string; computerName: string }[])[0]
+    expect(html).toContain("Hudson Rock")
+    expect(html).toContain(inf.stealerFamily)
+    expect(html).toContain(inf.computerName)
+  })
+
+  it("renders domain intelligence from the domain-intel frame", () => {
+    const html = renderResult(searchDescriptor, [recordFrame, domainFrame, { t: "done", stats: {} }], "done")
+    const d = (domainFrame.data as { domain: string; riskScore: number; whois: { registrar: string } })
+    expect(html).toContain("Domain intelligence")
+    expect(html).toContain(d.domain)
+    expect(html).toContain(String(d.riskScore))
+    expect(html).toContain(d.whois.registrar)
+  })
+
+  it("shows only records and no empty enrichment sections when no enrichment frames arrive", () => {
+    const html = renderResult(searchDescriptor, [recordFrame, { t: "done", stats: {} }], "done")
+    expect(html).toContain("Breach and leak records")
+    // A payload without the new frames must render NONE of their sections, not
+    // an empty placeholder for each.
+    expect(html).not.toContain("Full investigation")
+    expect(html).not.toContain("Hudson Rock")
+    expect(html).not.toContain("Domain intelligence")
+  })
+
+  it("does not read an interleaved enrichment frame as a breach record", () => {
+    // The enrichment frames carry no `records`, so the record count is derived
+    // purely from progress frames even when they interleave.
+    const html = renderResult(
+      searchDescriptor,
+      [investigationFrame, recordFrame, hudsonFrame, { t: "done", stats: {} }],
+      "done",
+    )
+    expect(html).toContain("Full investigation")
+    expect(html).toContain("Hudson Rock")
+    expect(html).toContain("LeakDB")
   })
 })

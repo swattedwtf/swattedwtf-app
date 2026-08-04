@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import { Coins, ExternalLink, ImageUp, ScanFace } from "lucide-react"
 
 import { classifyError, messageOf, type ClassifiedError } from "../lib/errors"
 import { formatSince } from "../lib/format"
@@ -38,6 +39,11 @@ import { EmptyState, Section } from "./ui"
  * emits a `faces` frame as progress and then exactly one `result` frame in the
  * same `{schema, data, partial}` envelope a lookup answers with, so everything
  * below the transport is ordinary.
+ *
+ * The layout mirrors the web Reverse Face page: a credit card across the top,
+ * then a two-column split of a photo uploader beside the matches, and match
+ * tiles drawn the way the web draws them (a quality chip on the thumbnail, the
+ * host and crawl date beneath).
  */
 
 /** The server module this screen runs. A key in a static table, never a path. */
@@ -161,8 +167,14 @@ export function coerce(data: unknown): FaceData {
   }
 }
 
-/** One match. The whole tile is the link, so the thumbnail is the target. */
-function MatchTile({ match }: { match: Match }) {
+/**
+ * One match, drawn the way the web draws it: the whole tile is the link to the
+ * page the face was found on, a quality chip sits on the thumbnail, and the host
+ * and crawl date read beneath. The thumbnail is the ONLY image that survives
+ * normalisation, since a match's own `imageUrl` is an arbitrary crawled host the
+ * proxy will not touch.
+ */
+function MatchTile({ match, index }: { match: Match; index: number }) {
   const crawled = formatSince(match.crawledAt)
   const label = match.sourceHost || "Open the page this face was found on"
 
@@ -171,27 +183,36 @@ function MatchTile({ match }: { match: Match }) {
       type="button"
       onClick={() => void ipc.openExternal(match.sourceUrl).catch(() => {})}
       title={match.sourceUrl}
-      className="glass-tile glass-tile-hover block overflow-hidden p-0 text-left"
+      style={{ "--i": index } as CSSProperties}
+      className="group glass-tile glass-tile-hover stagger-item block overflow-hidden p-0 text-left"
     >
-      <RemoteImage
-        url={match.thumbnailUrl}
-        alt={`Match on ${label}`}
-        name={label}
-        className="aspect-square w-full"
-      />
-      <span className="block px-2.5 py-2">
-        <span className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-[12px] text-white/85">{label}</span>
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--color-muted-foreground)]">
-            {Math.round(match.quality)}%
-          </span>
+      <span className="relative block">
+        <RemoteImage
+          url={match.thumbnailUrl}
+          alt={`Match on ${label}`}
+          name={label}
+          className="aspect-square w-full"
+        />
+        {/* The chip carries its own glass surface, so it stays legible over any
+            thumbnail without an inline background. */}
+        <span className="glass-tile absolute left-1.5 top-1.5 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-white">
+          {Math.round(match.quality)}%
         </span>
-        {crawled ? (
-          <span className="mt-0.5 block font-mono text-[10px] text-[var(--color-muted-foreground)]">
-            Crawled {crawled}
-          </span>
-        ) : null}
       </span>
+      <span className="flex items-center justify-between gap-1 px-2.5 pt-2">
+        <span className="truncate text-[12px] text-white/70">{label}</span>
+        <ExternalLink
+          className="h-3 w-3 shrink-0 text-[var(--color-muted-foreground)] opacity-0 transition-opacity group-hover:opacity-100"
+          aria-hidden="true"
+        />
+      </span>
+      {crawled ? (
+        <span className="block px-2.5 pb-2 pt-0.5 font-mono text-[10px] text-[var(--color-muted-foreground)]">
+          Crawled {crawled}
+        </span>
+      ) : (
+        <span className="block pb-2" aria-hidden="true" />
+      )}
     </button>
   )
 }
@@ -212,7 +233,7 @@ function MatchGrid({
     <Section title={`${title} (${total})`}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {matches.map((match, i) => (
-          <MatchTile key={`${match.id}-${i}`} match={match} />
+          <MatchTile key={`${match.id}-${i}`} match={match} index={i} />
         ))}
       </div>
       {total > matches.length ? (
@@ -271,7 +292,7 @@ export function FaceResult({ result }: { result: LookupResult }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 fade-in">
       <MatchGrid title="Web matches" matches={data.matches} total={data.webCount} />
       <MatchGrid title="Social matches" matches={data.socialMatches} total={data.socialCount} />
     </div>
@@ -306,6 +327,91 @@ export function OutOfCreditPanel({ message }: { message: string }) {
           Top up
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The wallet card that opens the page, mirroring the web's Reverse Face Credit
+ * panel: the label, the live balance as the loud figure, roughly how many
+ * searches that buys, and a Top up that opens the same page the web dialog lives
+ * on. The figure is the balance this screen believes it holds, seeded from the
+ * boot overview and decremented once per search that actually opened.
+ */
+export function CreditCard({ balanceCents }: { balanceCents: number }) {
+  const searchesLeft = Math.floor(Math.max(0, balanceCents) / SEARCH_COST_CENTS)
+  return (
+    <section className="glass">
+      <div className="glass-body">
+        <div className="flex items-center justify-between gap-4">
+          <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
+            <Coins className="h-3.5 w-3.5" aria-hidden="true" />
+            Reverse Face Credit
+          </p>
+          <button
+            type="button"
+            onClick={() => void ipc.openExternal(TOP_UP_URL).catch(() => {})}
+            className="btn-secondary btn-compact"
+          >
+            Top up
+          </button>
+        </div>
+        <div className="mt-4 flex items-baseline gap-2">
+          <span className="text-3xl font-semibold tabular-nums tracking-tight text-white">
+            {formatCredit(balanceCents)}
+          </span>
+          <span className="text-sm text-white/70">
+            about {searchesLeft} {searchesLeft === 1 ? "search" : "searches"} left
+          </span>
+        </div>
+        {/* The cost, stated before the button is pressed rather than after. This
+            is the one screen in the app where pressing Search spends money
+            outright, and a balance nobody was shown is a support ticket. */}
+        <p className="mt-2 text-[13px] text-[var(--color-muted-foreground)]">
+          {formatCredit(balanceCents)} credit left, about {searchesLeft}{" "}
+          {searchesLeft === 1 ? "search" : "searches"}. Each search costs{" "}
+          {formatCredit(SEARCH_COST_CENTS)}.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+/** The waiting state, drawn as skeleton tiles so the panel says work is happening. */
+function Searching({ faces }: { faces: number | null }) {
+  const message =
+    faces === null
+      ? "Detecting faces in that photo."
+      : faces === 1
+        ? "One face detected. Searching the web, this can take a minute."
+        : `${faces} faces detected. Searching the web, this can take a minute.`
+
+  return (
+    <div className="space-y-4 fade-in">
+      <p className="flex items-center gap-2 text-[13px] text-white/70">
+        <span
+          className="live-dot h-2 w-2 shrink-0 rounded-full bg-[var(--color-positive)]"
+          aria-hidden="true"
+        />
+        {message}
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-hidden="true">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="skeleton aspect-square w-full" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The resting right column: nothing has run, so it says what to do. */
+function IdlePrompt() {
+  return (
+    <div className="glass-tile flex min-h-[16rem] flex-col items-center justify-center gap-3 px-6 text-center">
+      <ScanFace className="h-6 w-6 text-[var(--color-muted-foreground)]" aria-hidden="true" />
+      <p className="max-w-xs text-[13px] text-white/70">
+        Upload a face and run the search to see where it appears online.
+      </p>
     </div>
   )
 }
@@ -451,112 +557,124 @@ export function FaceScreen({ overview }: { overview: Overview }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Reverse Face</h1>
-
-      <div className="glass">
-        <div className="glass-body">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-            <RemoteImage
-              url={picked?.dataUrl ?? null}
-              alt={picked ? picked.name : "No image chosen"}
-              name={picked ? picked.name : "?"}
-              className="h-32 w-32 shrink-0 rounded-2xl"
-            />
-
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-                Photo
-              </p>
-              <p className="mt-2 truncate text-sm text-white/85">
-                {picked ? picked.name : "Choose a photo to search."}
-              </p>
-              <p className="mt-1 text-[13px] text-[var(--color-muted-foreground)]">
-                {picked
-                  ? `${picked.mime.replace("image/", "").toUpperCase()}, ${Math.max(1, Math.round(picked.bytes / 1024))} KB`
-                  : "PNG, JPEG, GIF, WebP, AVIF or BMP, up to 8 MB."}
-              </p>
-
-              {pickError ? (
-                <p role="alert" className="mt-2 text-xs text-[var(--color-destructive)]">
-                  {pickError}
-                </p>
-              ) : null}
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void choose()}
-                  className="btn-secondary btn-compact"
-                >
-                  {picked ? "Change photo" : "Choose photo"}
-                </button>
-                {picked && !busy ? (
-                  <SubmitButton busy={false} onClick={() => void submit()} label="Search this face" />
-                ) : null}
-                {/* While a search runs the primary control cancels. The label
-                    is stable so the button does not resize under the pointer at
-                    the moment it is being pressed. */}
-                {busy ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Supersede this run so its late frames are dropped.
-                      runIdRef.current += 1
-                      stop()
-                      setBusy(false)
-                    }}
-                    className="btn-secondary btn-compact"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* The cost, stated before the button is pressed rather than after.
-              This is the one screen in the app where pressing Search spends
-              money outright, and a balance nobody was shown is a support
-              ticket. */}
-          <p className="mt-5 border-t border-white/[0.06] pt-4 text-[13px] text-[var(--color-muted-foreground)]">
-            {formatCredit(balanceCents)} credit left, about{" "}
-            {Math.floor(balanceCents / SEARCH_COST_CENTS)} searches. Each search costs{" "}
-            {formatCredit(SEARCH_COST_CENTS)}.
+      <header className="flex items-center gap-3">
+        <span className="glass-tile flex h-10 w-10 shrink-0 items-center justify-center">
+          <ScanFace className="h-5 w-5 text-white" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight">Reverse Face</h1>
+          <p className="mt-0.5 text-sm text-white/70">
+            Upload a photo to find where that face appears across the internet via facial
+            recognition.
           </p>
         </div>
+      </header>
+
+      {/* Reverse Face is the only credit-billed feature ($0.60/search). */}
+      <CreditCard balanceCents={balanceCents} />
+
+      <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
+        {/* Uploader. The picker is a native Rust dialog (magic-byte sniffed,
+            size-capped before the gate); the webview holds no filesystem
+            permission and only ever receives the data: URL back. */}
+        <div className="space-y-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void choose()}
+            className="glass-tile glass-tile-hover relative flex aspect-square w-full flex-col items-center justify-center overflow-hidden p-0 text-center"
+          >
+            {picked ? (
+              <RemoteImage
+                url={picked.dataUrl}
+                alt={picked.name}
+                name={picked.name}
+                className="h-full w-full"
+              />
+            ) : (
+              <span className="flex flex-col items-center gap-2 px-6">
+                <ImageUp className="h-6 w-6 text-[var(--color-muted-foreground)]" aria-hidden="true" />
+                <span className="text-sm text-white">Choose a photo to search.</span>
+                <span className="font-mono text-[11px] text-[var(--color-muted-foreground)]">
+                  PNG, JPEG, GIF, WebP, AVIF or BMP, up to 8 MB.
+                </span>
+              </span>
+            )}
+          </button>
+
+          {picked ? (
+            <p className="truncate text-[13px] text-white/70">
+              <span className="text-white">{picked.name}</span>
+              <span className="text-[var(--color-muted-foreground)]">
+                {" "}
+                {picked.mime.replace("image/", "").toUpperCase()},{" "}
+                {Math.max(1, Math.round(picked.bytes / 1024))} KB
+              </span>
+            </p>
+          ) : null}
+
+          {pickError ? (
+            <p role="alert" className="text-xs text-[var(--color-destructive)]">
+              {pickError}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void choose()}
+              className="btn-secondary btn-compact"
+            >
+              {picked ? "Change photo" : "Choose photo"}
+            </button>
+            {picked && !busy ? (
+              <SubmitButton busy={false} onClick={() => void submit()} label="Search this face" />
+            ) : null}
+            {/* While a search runs the primary control cancels. The label is
+                stable so the button does not resize under the pointer at the
+                moment it is being pressed. */}
+            {busy ? (
+              <button
+                type="button"
+                onClick={() => {
+                  // Supersede this run so its late frames are dropped.
+                  runIdRef.current += 1
+                  stop()
+                  setBusy(false)
+                }}
+                className="btn-secondary btn-compact"
+              >
+                Cancel
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Results and every state they can be in, in the second column. */}
+        <div className="min-w-0">
+          {outOfCredit && refusal ? (
+            <OutOfCreditPanel message={refusal.message} />
+          ) : refusal ? (
+            <OutcomePanel outcome={refusal} onRetry={() => void submit()} />
+          ) : streamError ? (
+            // A dropped connection, or a stream that ended with no answer. Its
+            // own panel, never an empty grid: the search was paid for, and "we
+            // lost the answer" is a different statement from "this face is
+            // nowhere".
+            <OutcomePanel
+              outcome={{ kind: "error", message: streamError }}
+              onRetry={() => void submit()}
+            />
+          ) : busy ? (
+            <Searching faces={faces} />
+          ) : result ? (
+            <FaceResult result={result} />
+          ) : (
+            <IdlePrompt />
+          )}
+        </div>
       </div>
-
-      {outOfCredit && refusal ? <OutOfCreditPanel message={refusal.message} /> : null}
-      {refusal && !outOfCredit ? (
-        <OutcomePanel outcome={refusal} onRetry={() => void submit()} />
-      ) : null}
-
-      {/* A dropped connection, or a stream that ended with no answer. Its own
-          panel, never an empty grid: the search was paid for, and "we lost the
-          answer" is a different statement from "this face is nowhere". */}
-      {streamError ? (
-        <OutcomePanel
-          outcome={{ kind: "error", message: streamError }}
-          onRetry={() => void submit()}
-        />
-      ) : null}
-
-      {busy ? (
-        <Section title="Searching">
-          <EmptyState
-            message={
-              faces === null
-                ? "Detecting faces in that photo."
-                : faces === 1
-                  ? "One face detected. Searching the web, this can take a minute."
-                  : `${faces} faces detected. Searching the web, this can take a minute.`
-            }
-          />
-        </Section>
-      ) : null}
-
-      {result ? <FaceResult result={result} /> : null}
     </div>
   )
 }

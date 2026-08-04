@@ -9,6 +9,7 @@ import {
   Wallet,
 } from "lucide-react"
 import { ThemeSection } from "./ThemeSection"
+import { copyText } from "../lib/clipboard"
 
 import type { IntegrityReport } from "../boot/machine"
 import { ipc, type Overview, type SettingsView, type WindowDiagnostics } from "../lib/ipc"
@@ -286,9 +287,14 @@ export function ShortcutSection({
     return () => window.removeEventListener("keydown", onKeyDown, true)
   }, [recording])
 
+  // Whether settings have loaded at all. Before they do (and permanently if the
+  // read threw, which `refresh` swallows) `view` is null, and reporting "Not
+  // bound" over a hotkey that is actually working, with an enabled Disable
+  // button, is a lie the user could act on. Unknown is its own state.
+  const loaded = view !== null
   const active = view?.shortcutActive ?? null
   const stored = view?.shortcut ?? null
-  const disabled = view !== null && stored === null
+  const disabled = loaded && stored === null
 
   return (
     <Panel title="Shortcuts" icon={<Keyboard className="h-4 w-4 opacity-70" aria-hidden="true" />}>
@@ -296,7 +302,13 @@ export function ShortcutSection({
         label="Quick lookup"
         value={
           <span className="font-mono text-[13px]">
-            {active ? formatCombo(active) : disabled ? "Turned off" : "Not bound"}
+            {!loaded
+              ? "Checking..."
+              : active
+                ? formatCombo(active)
+                : disabled
+                  ? "Turned off"
+                  : "Not bound"}
           </span>
         }
       />
@@ -352,7 +364,9 @@ export function ShortcutSection({
             setRejected(null)
             onApply(null)
           }}
-          disabled={busy || disabled}
+          // Also disabled before settings load: turning off a hotkey whose state
+          // we have not read yet would be acting on a guess.
+          disabled={busy || disabled || !loaded}
           className="btn-secondary btn-compact"
         >
           Disable
@@ -557,10 +571,10 @@ export function AdvancedSection({
               <button
                 type="button"
                 onClick={() => {
-                  void navigator.clipboard
-                    .writeText(JSON.stringify(diag, null, 2))
-                    .then(() => setCopied(true))
-                    .catch(() => setCopied(false))
+                  // Through the shared helper: reading navigator.clipboard
+                  // directly threw synchronously past this .catch on a webview
+                  // where the property is absent.
+                  void copyText(JSON.stringify(diag, null, 2)).then(setCopied)
                 }}
                 className="btn-secondary btn-compact"
               >

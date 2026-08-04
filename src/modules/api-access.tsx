@@ -3,6 +3,7 @@ import { ArrowRight, BookText, Code2, Gauge, Infinity as InfinityIcon } from "lu
 
 import { ipc, type Overview } from "../lib/ipc"
 import { formatCount } from "../lib/format"
+import { copyText } from "../lib/clipboard"
 import { withDefaults } from "./safe"
 
 /**
@@ -88,14 +89,13 @@ function ApiKeyRow({ apiKey }: { apiKey: string }) {
   const masked = "•".repeat(Math.max(16, Math.min(apiKey.length, 32)))
 
   function copy() {
-    if (typeof navigator === "undefined" || !navigator.clipboard) return
-    void navigator.clipboard
-      .writeText(apiKey)
-      .then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1600)
-      })
-      .catch(() => {})
+    // Through the shared helper so a webview without navigator.clipboard still
+    // copies via the execCommand fallback rather than silently doing nothing.
+    void copyText(apiKey).then((ok) => {
+      if (!ok) return
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1600)
+    })
   }
 
   return (

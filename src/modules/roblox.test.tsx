@@ -118,6 +118,33 @@ const sparse = {
 const render = (data: unknown, partial: string[] = []) =>
   renderToStaticMarkup(<Result data={data} partial={partial} />)
 
+describe("Roblox stealer victim coercion", () => {
+  // A victim row missing device_user_str used to reach `.join(", ")` and throw
+  // in render, white-windowing the whole app. Each element is coerced now.
+  const withBrokenVictim = {
+    ...full,
+    stealer: {
+      stealerEntries: [],
+      breaches: [],
+      victims: [
+        // Every string-array field absent or the wrong type, plus a null row.
+        { log_id: "L1" },
+        { log_id: "L2", device_user_str: null, device_ips: "not-an-array", total_docs: "x" },
+        null,
+      ],
+    },
+  }
+
+  it("does not throw on a victim with missing or mistyped fields", () => {
+    expect(() => render(withBrokenVictim)).not.toThrow()
+  })
+
+  it("still renders the coerced victim's log id as a fallback", () => {
+    const html = render(withBrokenVictim)
+    expect(html).toContain("L1")
+  })
+})
+
 describe("Roblox profile result", () => {
   it("renders the identity, stats, groups, badges and favorites", () => {
     const html = render(full)

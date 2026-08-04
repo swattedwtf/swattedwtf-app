@@ -1,6 +1,6 @@
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
-import { list, withDefaults } from "./safe"
+import { list, rows, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
 import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./ui"
 
@@ -81,6 +81,41 @@ type StealerVictim = {
   indexed_at: string
 }
 
+const EMPTY_VICTIM: StealerVictim = {
+  log_id: "",
+  machine_grant: "",
+  device_user_str: [],
+  device_ips: [],
+  device_emails_str: [],
+  discord_ids: [],
+  total_docs: 0,
+  pwned_at: "",
+  indexed_at: "",
+}
+
+/**
+ * Coerce ONE victim, not just the outer array.
+ *
+ * `list<StealerVictim>` guarantees an array of elements but not the shape of
+ * each: a victim missing `device_user_str`, or sending it as null, reached the
+ * render as-is, where `v.device_user_str.join(", ")` threw and took the whole
+ * window down (this app has no reachable console; a render throw is an
+ * unrecoverable blank until the next release). The string-array fields are
+ * forced back to arrays and the scalars given their zero value, so a drifted
+ * provider row degrades to an empty device rather than a crash.
+ */
+function coerceVictim(raw: unknown): StealerVictim {
+  const v = withDefaults(raw, EMPTY_VICTIM)
+  return {
+    ...v,
+    device_user_str: list<string>(v.device_user_str),
+    device_ips: list<string>(v.device_ips),
+    device_emails_str: list<string>(v.device_emails_str),
+    discord_ids: list<string>(v.discord_ids),
+    total_docs: typeof v.total_docs === "number" ? v.total_docs : 0,
+  }
+}
+
 type StealerBreach = {
   id: string
   email: string
@@ -146,17 +181,17 @@ export function Result({ data, partial }: ResultProps) {
     found: raw.found === true,
     profile: p,
     stats: withDefaults(raw.stats, { friends: 0, followers: 0, following: 0 }),
-    groups: list(raw.groups),
-    badges: list(raw.badges),
-    favorites: list(raw.favorites),
-    usernameHistory: list(raw.usernameHistory),
+    groups: rows(raw.groups),
+    badges: rows(raw.badges),
+    favorites: rows(raw.favorites),
+    usernameHistory: rows(raw.usernameHistory),
     linkedDiscord: raw.linkedDiscord
       ? withDefaults(raw.linkedDiscord, { id: "", avatarUrl: null })
       : null,
     stealer: {
-      stealerEntries: list<StealerEntry>(stealerRaw.stealerEntries),
-      victims: list<StealerVictim>(stealerRaw.victims),
-      breaches: list<StealerBreach>(stealerRaw.breaches),
+      stealerEntries: rows<StealerEntry>(stealerRaw.stealerEntries),
+      victims: list<unknown>(stealerRaw.victims).map(coerceVictim),
+      breaches: rows<StealerBreach>(stealerRaw.breaches),
     },
     stealerLocked: raw.stealerLocked === true,
   }

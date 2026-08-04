@@ -4,10 +4,16 @@ import { renderToStaticMarkup } from "react-dom/server"
 import {
   FailurePanel,
   MonitorScreen,
+  NO_WATCHES_TITLE,
+  RunRow,
+  SCANNER_TYPES,
+  WATCH_LIMIT,
+  WatchRow,
   monitorsFrom,
   relativeTime,
   runSummary,
   runsFrom,
+  runsTitle,
   sampleLine,
   toMonitor,
   toRun,
@@ -161,6 +167,71 @@ describe("refusals", () => {
   })
 })
 
+describe("a watch row carries the row's own data", () => {
+  const watch = toMonitor({
+    id: "m1",
+    email: "target@example.com",
+    status: "active",
+    scanner_type: "stealer",
+    last_run_at: "2026-08-04T09:00:00Z",
+    next_run_at: "2026-08-04T15:00:00Z",
+    total_results_found: 4210,
+  })
+
+  const render = (monitor = watch, selected = true) =>
+    renderToStaticMarkup(
+      <WatchRow
+        monitor={monitor}
+        selected={selected}
+        removing={false}
+        onSelect={() => {}}
+        onRemove={() => {}}
+      />,
+    )
+
+  it("shows the address, the scanner kind and the count as a person reads it", () => {
+    const html = render()
+    expect(html).toContain(watch.email)
+    expect(html).toContain(watch.scanner_type)
+    // The thousands separator is the whole reason the count goes through
+    // toLocaleString, so assert the formatted form rather than the digits.
+    expect(html).toContain(watch.total_results_found.toLocaleString("en-US"))
+  })
+
+  it("names the address in the remove control, so two rows are never confused", () => {
+    expect(render()).toContain(`Remove the watch on ${watch.email}`)
+  })
+
+  it("pulses only while the scanner is actually active", () => {
+    expect(render()).toContain("live-dot")
+    expect(render(toMonitor({ ...watch, status: "paused" }))).not.toContain("live-dot")
+  })
+})
+
+describe("a run row", () => {
+  const render = (run: unknown) => renderToStaticMarkup(<RunRow run={toRun(run)} />)
+
+  it("prints the summary its own function produced", () => {
+    const run = toRun({ uid: "r1", results_count: 2, completed_at: "2026-08-04T09:00:00Z" })
+    expect(render(run)).toContain(runSummary(run).text)
+  })
+
+  it("shows the sample lines the scanner returned", () => {
+    const sample = { email: "a@b.c", password: "hunter2" }
+    expect(render({ uid: "r1", results_count: 1, results_sample: [sample] })).toContain(
+      sampleLine(sample),
+    )
+  })
+
+  it("never dresses a failed scan as a clean one", () => {
+    const failed = toRun({ uid: "r1", results_count: 0, error_message: "proxy died" })
+    const html = render(failed)
+    expect(html).toContain(failed.error_message)
+    expect(html).toContain(runSummary(failed).text)
+    expect(html).not.toContain(runSummary(toRun({ uid: "r2" })).text)
+  })
+})
+
 describe("the screen itself", () => {
   // Effects do not run in a static render, so this is the first paint: what the
   // user sees before the list has arrived.
@@ -173,17 +244,47 @@ describe("the screen itself", () => {
 
   it("does not claim nothing is being watched before the list has loaded", () => {
     // An unloaded list and an empty one are different claims, and only one of
-    // them is safe to make.
-    expect(html).toContain("Loading watches.")
-    expect(html).not.toContain("Nothing is being watched yet")
+    // them is safe to make. A shimmer says "still asking"; the empty headline
+    // says "there is nothing", and it must not appear yet.
+    expect(html).toContain("skeleton")
+    expect(html).not.toContain(NO_WATCHES_TITLE)
   })
 
-  it("offers the add form and the alerts pane", () => {
-    expect(html).toContain("Add a watch")
-    expect(html).toContain("Recent alerts")
+  it("does not count scanners against the cap before it knows the count", () => {
+    expect(html).not.toContain(`/ ${WATCH_LIMIT.toLocaleString("en-US")}`)
+  })
+
+  it("offers both scanner kinds on the add row", () => {
+    for (const type of SCANNER_TYPES) expect(html).toContain(type.label)
+    expect(html).toContain("Email to monitor")
+  })
+
+  it("shows the alert pane unnamed until a watch is selected", () => {
+    expect(html).toContain(runsTitle(null).caption)
+    expect(runsTitle(null).subject).toBeNull()
+    expect(html).toContain("Select a watch to see its scan history.")
+  })
+
+  it("names the watch it is showing without shouting the address in caps", () => {
+    // An email set in mono caps reads as a different address from the one the
+    // user typed, so the caption stays capitalised and the address does not.
+    const named = runsTitle("Target@Example.com")
+    expect(named.subject).toBe("Target@Example.com")
+    expect(named.caption).not.toContain(named.subject)
   })
 
   it("uses no em dashes in any copy", () => {
     expect(html).not.toContain("—")
+  })
+
+  it("draws every surface with a shared class rather than a colour of its own", () => {
+    // The rule the app is held to: panels, tiles, wells and buttons come from
+    // theme.css. A hex or a hand-mixed background here is how sixteen screens
+    // drift into sixteen looks.
+    expect(html).not.toMatch(/bg-\[#/)
+    expect(html).not.toMatch(/style="[^"]*background/)
+    expect(html).toContain("glass-tile")
+    expect(html).toContain("glass-input")
+    expect(html).toContain("btn-primary")
   })
 })

@@ -150,7 +150,7 @@ export function StreamScreen({ descriptor }: { descriptor: StreamModuleDescripto
             onKeyDown={(e) => {
               if (e.key === "Enter") void submit()
             }}
-            className="h-10 min-w-0 flex-1 select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-3.5 text-sm shadow-[inset_0_1px_2px_0_rgba(0,0,0,0.45)] outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
+            className="h-10 min-w-0 flex-1 select-text glass-input px-3.5 text-sm outline-none"
           />
           {trailing}
         </div>

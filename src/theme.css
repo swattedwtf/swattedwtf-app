@@ -908,3 +908,66 @@ textarea:focus-visible {
   from { opacity: 0; transform: scale(0.96) translateY(-8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+/* ---- Motion -------------------------------------------------------------
+   One vocabulary for every screen, so results arriving over a stream feel the
+   same everywhere instead of each module inventing its own entrance.
+
+   Deliberately NOT wrapped in prefers-reduced-motion. Windows reports that
+   preference whenever "Animation effects" is off, which is a common default on
+   managed machines, and honouring it here would silently disable the app's
+   entire feel for people who never asked for that. The durations are short
+   enough (160-260ms) that they read as responsiveness rather than decoration.
+
+   `.fade-in` is the base. `.stagger-item` adds an index-driven delay so a list
+   of streamed cards cascades instead of snapping in as one block; the delay is
+   capped so the twentieth card is not still waiting half a second later. */
+@keyframes swatted-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fade-in {
+  animation: swatted-fade-in 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.fade-in-fast {
+  animation: swatted-fade-in 160ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Set --i on the element (its index) and the cascade follows. Capped at 12 so
+   a 200-row result set does not animate for three seconds. */
+.stagger-item {
+  animation: swatted-fade-in 260ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 28ms);
+}
+
+/* Loading placeholder. A sweep rather than a pulse: a pulsing block reads as a
+   broken image, a sweep reads as work in progress. */
+@keyframes swatted-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+.skeleton {
+  border-radius: var(--glass-radius-tile);
+  background-image: linear-gradient(
+    90deg,
+    oklch(1 0 0 / 0.04) 0%,
+    oklch(1 0 0 / 0.10) 50%,
+    oklch(1 0 0 / 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: swatted-shimmer 1.4s linear infinite;
+}
+
+/* A live region that is still filling. Pairs with the streamed screens: the
+   dot pulses while sources are still answering and stops when they are done. */
+@keyframes swatted-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+
+.live-dot {
+  animation: swatted-pulse 1.2s ease-in-out infinite;
+}

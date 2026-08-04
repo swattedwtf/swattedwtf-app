@@ -76,7 +76,11 @@ export function bootReducer(state: BootState, event: BootEvent): BootState {
             ...state,
             phase: "tampered",
             integrityOk: false,
-            changedFiles: event.report.changed,
+            // `?? []`: the tamper screen does `changedFiles.slice(0, n).map(...)`,
+            // so a report from Rust that omitted `changed` would crash the very
+            // screen whose job is to warn the user, leaving them on a blank
+            // window instead. An empty list still shows the tampered state.
+            changedFiles: event.report.changed ?? [],
           }
 
     case "ignore_tamper":

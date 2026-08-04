@@ -215,6 +215,16 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<Outcome>({ status: "idle" })
+  // Bumped on every completed lookup, and used as the Result's key.
+  //
+  // A module's Result may hold its own state: the Machine Browser keeps the
+  // victim the user picked. Result is a stable module-level component and was
+  // rendered without a key, so React reused the instance across searches and
+  // that pick survived, attaching one person's machine dump to the next
+  // person's query, which in an OSINT tool is a serious data-integrity fault,
+  // not a cosmetic one. Keying by the run forces a fresh mount per result, so
+  // internal state cannot bleed between two searches.
+  const [runId, setRunId] = useState(0)
 
   const inline = descriptor.inputs.length <= 1
 
@@ -228,6 +238,7 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
       return
     }
     setErrors({})
+    setRunId((n) => n + 1)
     setOutcome(next)
   }
 
@@ -308,7 +319,7 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
       ) : null}
 
       {outcome.status === "done" ? (
-        <ResultView descriptor={descriptor} result={outcome.result} />
+        <ResultView key={runId} descriptor={descriptor} result={outcome.result} />
       ) : null}
     </div>
   )

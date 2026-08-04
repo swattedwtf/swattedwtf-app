@@ -1,6 +1,6 @@
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
-import { list, withDefaults } from "./safe"
+import { list, rows, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
 import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./ui"
 
@@ -79,14 +79,14 @@ export function Result({ data }: ResultProps) {
   const d: DiscordData = {
     ...(raw as DiscordData),
     profile: p,
-    badges: list(raw.badges),
-    connections: list(raw.connections),
-    servers: list(raw.servers),
-    breaches: list(raw.breaches),
-    moderation: list(raw.moderation),
-    stealerLogs: list(raw.stealerLogs),
+    badges: rows(raw.badges),
+    connections: rows(raw.connections),
+    servers: rows(raw.servers),
+    breaches: rows(raw.breaches),
+    moderation: rows(raw.moderation),
+    stealerLogs: rows(raw.stealerLogs),
     alts: list(raw.alts),
-    usernameHistory: raw.usernameHistory === null ? null : list(raw.usernameHistory),
+    usernameHistory: raw.usernameHistory === null ? null : rows(raw.usernameHistory),
     messages: withDefaults(raw.messages, { total: 0, items: [] }),
     vpnAttempts: typeof raw.vpnAttempts === "number" ? raw.vpnAttempts : 0,
     historyUnavailable: raw.historyUnavailable === true,

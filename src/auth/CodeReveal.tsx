@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { ipc } from "../lib/ipc"
 import { formatLoginCode } from "./code"
 import { messageOf } from "../lib/errors"
+import { copyText } from "../lib/clipboard"
 
 /** How long the "Copied" confirmation stays on the copy button. */
 const COPIED_MS = 1600
@@ -29,14 +30,16 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
 
   async function copy() {
     setError("")
-    try {
-      await navigator.clipboard.writeText(formatLoginCode(code))
+    // Through the shared helper, which falls back to execCommand when
+    // navigator.clipboard is absent or rejects. This is the recovery-code
+    // screen shown once, so the WebKitGTK-without-a-clipboard-owner case that
+    // the fallback exists for is exactly the case that must not fail here.
+    if (await copyText(formatLoginCode(code))) {
       setCopied(true)
       if (copiedTimer.current) clearTimeout(copiedTimer.current)
       copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS)
-    } catch {
-      // Clipboard access can be denied by the webview. The code is on screen,
-      // so this is a nuisance, not a dead end.
+    } else {
+      // The code is on screen, so a genuine failure is a nuisance, not a dead end.
       setError("Could not copy. Write the code down instead.")
     }
   }

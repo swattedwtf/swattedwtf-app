@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react"
 import {
   Bell,
   BellRing,
@@ -12,7 +12,7 @@ import {
 
 import { ipc } from "../lib/ipc"
 import { classifyError, type ClassifiedError } from "../lib/errors"
-import { EmptyState, PLANS_URL, Section } from "./ui"
+import { PLANS_URL } from "./ui"
 import { list, withDefaults } from "./safe"
 
 /**
@@ -24,12 +24,22 @@ import { list, withDefaults } from "./safe"
  * result to cache and nothing to meter, so it is a built-in route beside
  * /dashboard, /settings and /api rather than an entry in MODULES.
  *
+ * The web's structure is reproduced section for section: an icon header with the
+ * scanner count on the right, then the add row, then a two-column body with the
+ * watch list on the left and that watch's scanner runs on the right.
+ *
  * HEIST ONLY, exactly as on the web. Every monitor route on the server runs
  * `requireFeatureAccess(user, "heist")`, so an account below Heist is refused
  * with a 402 `heist_required` whatever it asks for. This screen does not
  * re-implement that decision: it asks the server, and a refusal renders as the
  * upgrade panel carrying the server's own copy. That way the gate cannot drift
  * out of step with the web by a client release.
+ *
+ * WHAT IS NOT HERE: the web's lightning bolt, which triggers a scan by hand.
+ * That route calls `chargeForSearch`, so it is metered; the desktop transport is
+ * not, and a cheaper way to hit the same upstream is exactly the kind of drift
+ * the two surfaces must not develop. Pausing a watch is absent for the same
+ * reason it is absent from the desktop transport: there is no action for it.
  *
  * The distinction this screen works hardest to keep is between "nothing has
  * turned up" and "we could not ask". An empty watch list and a list that failed
@@ -83,6 +93,21 @@ const EMPTY_RUN: MonitorRun = {
 }
 
 const TERMS_URL = "https://swattedw.tf/terms"
+
+/**
+ * How many watches an account may hold. The server answers a second one with a
+ * 409, so this is the number the header counts against rather than a guess.
+ */
+export const WATCH_LIMIT = 1
+
+/**
+ * The copy shown when the account genuinely watches nothing.
+ *
+ * Exported because "nothing is being watched" and "the list has not loaded" are
+ * different claims and only one of them is safe to make. A test proves the first
+ * is absent from a screen that has not loaded, which needs the string once.
+ */
+export const NO_WATCHES_TITLE = "No monitors yet"
 
 /**
  * Coerces a row the server sent into something safe to render.
@@ -202,6 +227,13 @@ export function runSummary(run: MonitorRun): { tone: "hit" | "clear" | "failed";
   return { tone: "clear", text: "No new exposures" }
 }
 
+/** The dot colour each outcome wears, so the three never share one. */
+const TONE_DOT: Record<"hit" | "clear" | "failed", string> = {
+  hit: "bg-amber-400",
+  clear: "bg-emerald-400",
+  failed: "bg-red-400",
+}
+
 /** The session-expired copy, written for this screen rather than the server's
  *  bare "Not authenticated". Nothing here clears the session: only the overview
  *  path in app.tsx does that. */
@@ -233,7 +265,7 @@ export function FailurePanel({
     action = { label: "Retry", run: onRetry }
 
   return (
-    <div className="glass">
+    <div className="glass fade-in">
       <div className="glass-body">
         <p className="max-w-[62ch] text-sm text-white/85">
           {outcome.kind === "auth" ? AUTH_MESSAGE : outcome.message}
@@ -263,10 +295,160 @@ function InlineFailure({ message, onRetry }: { message: string; onRetry?: () => 
 }
 
 /** The two kinds of scanner, as the server names them. */
-const SCANNER_TYPES: { id: string; label: string; hint: string }[] = [
+export const SCANNER_TYPES: { id: string; label: string; hint: string }[] = [
   { id: "breach", label: "Breach", hint: "Public breach corpora" },
   { id: "stealer", label: "Stealer", hint: "Infostealer logs" },
 ]
+
+/**
+ * The alert pane's caption, in two pieces.
+ *
+ * The pane names the watch it is showing, because with a watch selected it is
+ * that address's history and not a general one. The address is deliberately NOT
+ * part of the mono caps caption: an email set in capitals reads as a different
+ * address from the one the user typed, and the row above it shows the lowercase
+ * form the server holds.
+ */
+export function runsTitle(email: string | null): { caption: string; subject: string | null } {
+  return { caption: "Runs", subject: email && email !== "" ? email : null }
+}
+
+/** The mono caption the web sets above each of the two columns. */
+function ListCaption({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <h2 className="min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
+        {title}
+      </h2>
+      {detail ? (
+        <span className="shrink-0 font-mono text-[11px] text-white/70">{detail}</span>
+      ) : null}
+    </div>
+  )
+}
+
+/** "Nothing here yet", the way the web draws it: a ringed icon over two lines. */
+function EmptyPanel({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="glass-tile flex flex-col items-center justify-center px-6 py-12 text-center">
+      <span className="glass-tile grid h-12 w-12 place-items-center rounded-2xl">
+        <Bell className="h-5 w-5 text-white/70" aria-hidden="true" />
+      </span>
+      <p className="mt-4 text-sm font-medium text-white">{title}</p>
+      <p className="mt-1 max-w-[46ch] text-xs text-white/70">{detail}</p>
+    </div>
+  )
+}
+
+/**
+ * One watched address.
+ *
+ * Exported so the row can be rendered against a fixture and checked for the
+ * fields it is supposed to carry, rather than by matching a sentence.
+ */
+export function WatchRow({
+  monitor,
+  selected,
+  removing,
+  onSelect,
+  onRemove,
+}: {
+  monitor: MonitorRow
+  selected: boolean
+  removing: boolean
+  onSelect: () => void
+  onRemove: () => void
+}) {
+  const Icon = monitor.scanner_type === "stealer" ? HardDrive : Database
+  const active = monitor.status === "active"
+
+  return (
+    <div
+      className={`glass-tile glass-tile-hover flex flex-wrap items-center gap-3 px-4 py-3 ${
+        selected ? "" : "opacity-85"
+      }`}
+    >
+      <span className="glass-tile grid h-9 w-9 shrink-0 place-items-center rounded-xl">
+        <Bell className={`h-4 w-4 ${active ? "text-emerald-300" : "text-white/60"}`} aria-hidden="true" />
+      </span>
+
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="min-w-0 flex-1 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-medium text-white">{monitor.email}</span>
+          <span className="glass-tile inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-white/70">
+            <Icon className="h-2.5 w-2.5" aria-hidden="true" />
+            {monitor.scanner_type}
+          </span>
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-white/70">
+          <span
+            aria-hidden="true"
+            className={`inline-block h-1.5 w-1.5 rounded-full ${
+              active ? "bg-emerald-400 live-dot" : "bg-white/30"
+            }`}
+          />
+          <span>
+            {monitor.status} · last run {relativeTime(monitor.last_run_at)} ·{" "}
+            {monitor.total_results_found.toLocaleString("en-US")} found · next{" "}
+            {untilTime(monitor.next_run_at)}
+          </span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={removing}
+        aria-busy={removing}
+        aria-label={`Remove the watch on ${monitor.email}`}
+        className="btn-secondary btn-compact shrink-0"
+      >
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+        Remove
+      </button>
+    </div>
+  )
+}
+
+/**
+ * One finished scan in the alert history.
+ *
+ * The dot and the headline come from `runSummary`, so a failed scan cannot pick
+ * up the wording or the colour of a clean one.
+ */
+export function RunRow({ run }: { run: MonitorRun }) {
+  const summary = runSummary(run)
+  const samples = run.results_sample.slice(0, 3).map(sampleLine).filter((line) => line !== "")
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT[summary.tone]}`}
+        />
+        <span className="text-[13px] font-medium text-white">{summary.text}</span>
+        <span className="ml-auto shrink-0 font-mono text-[10px] text-white/50">
+          {relativeTime(run.completed_at ?? run.started_at)}
+        </span>
+      </div>
+      {run.error_message ? (
+        <p className="mt-1 pl-3.5 text-[12px] text-white/70">{run.error_message}</p>
+      ) : (
+        samples.map((line, i) => (
+          <p key={i} className="mt-1 truncate pl-3.5 font-mono text-[11px] text-white/70">
+            {line}
+          </p>
+        ))
+      )}
+    </div>
+  )
+}
 
 type ListState =
   | { phase: "loading" }
@@ -374,29 +556,38 @@ export function MonitorScreen() {
 
   const monitors = state.phase === "ready" ? state.monitors : []
   const selected = monitors.find((m) => m.id === selectedId) ?? null
+  const activeCount = monitors.filter((m) => m.status === "active").length
   // The server allows one watch per account and answers a second one with a 409.
   // Saying so up front is friendlier than letting the user type an address and
   // then refusing it.
-  const atCapacity = monitors.length >= 1
+  const atCapacity = monitors.length >= WATCH_LIMIT
   // Closed while the list is still arriving too. An empty list that has not
   // loaded yet is not proof there is room, and submitting into that gap is how a
   // user meets a 409 they had no way to anticipate.
   const formClosed = adding || atCapacity || state.phase !== "ready"
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
-      <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-          / Monitor
-        </p>
-        <h1 className="mt-1 flex items-center gap-2 text-3xl font-semibold tracking-tight text-white">
-          <BellRing className="h-6 w-6" aria-hidden="true" />
-          Monitor
-        </h1>
-        <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-          Watch an email for new breaches and stealer-log exposures. The scanner keeps checking on
-          its own and records what it finds.
-        </p>
+    <div className="mx-auto w-full max-w-5xl space-y-7">
+      <div className="fade-in flex flex-wrap items-start gap-4">
+        <span className="glass-tile grid h-11 w-11 shrink-0 place-items-center rounded-2xl">
+          <BellRing className="h-5 w-5 text-white" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
+            / Monitor
+          </p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">Monitor</h1>
+          <p className="mt-1 max-w-[70ch] text-sm text-white/70">
+            Watch an email for new breaches and stealer-log exposures. The OathNet scanner keeps
+            checking on its own and tells you when something turns up.
+          </p>
+        </div>
+        {state.phase === "ready" ? (
+          <span className="glass-tile shrink-0 rounded-full px-3 py-1.5 font-mono text-[11px] text-white/70">
+            {monitors.length.toLocaleString("en-US")} / {WATCH_LIMIT.toLocaleString("en-US")}{" "}
+            {WATCH_LIMIT === 1 ? "scanner" : "scanners"}
+          </span>
+        ) : null}
       </div>
 
       {state.phase === "failed" ? (
@@ -406,30 +597,19 @@ export function MonitorScreen() {
         <FailurePanel outcome={state.outcome} onRetry={() => void load()} />
       ) : (
         <>
-          <Section title="Add a watch">
-            <form onSubmit={onAdd} className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={formClosed}
-                  placeholder="target@example.com"
-                  aria-label="Email to monitor"
-                  className="glass-input min-w-0 flex-1 px-3 py-2 text-[13px]"
-                />
-                <button
-                  type="submit"
-                  disabled={!email.trim() || formClosed}
-                  aria-busy={adding}
-                  className="btn-primary btn-compact"
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add watch
-                </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
+          {/* Add a watch. One row, the way the web opens the page. */}
+          <form onSubmit={onAdd} className="fade-in space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={formClosed}
+                placeholder="Email to monitor, for example target@example.com"
+                aria-label="Email to monitor"
+                className="glass-input h-11 min-w-0 flex-1 select-text px-4 text-sm outline-none"
+              />
+              <div className="glass-tile flex shrink-0 items-center gap-1 rounded-full p-1">
                 {SCANNER_TYPES.map((type) => {
                   const on = scannerType === type.id
                   const Icon = type.id === "stealer" ? HardDrive : Database
@@ -447,183 +627,157 @@ export function MonitorScreen() {
                     </button>
                   )
                 })}
-                <span className="text-[12px] text-[var(--color-muted-foreground)]">
-                  {SCANNER_TYPES.find((t) => t.id === scannerType)?.hint}
-                </span>
               </div>
+              <button
+                type="submit"
+                disabled={!email.trim() || formClosed}
+                aria-busy={adding}
+                className="btn-primary shrink-0"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add monitor
+              </button>
+            </div>
 
-              {adding ? (
-                <p className="font-mono text-[11px] text-[var(--color-muted-foreground)]">
-                  Provisioning the scanner. Clearing Cloudflare can take about 30 seconds the first
-                  time.
-                </p>
-              ) : null}
+            <p className="text-[12px] text-white/70">
+              {SCANNER_TYPES.find((t) => t.id === scannerType)?.hint}
+              {atCapacity
+                ? ". One watch per account, so remove the one below to watch a different address."
+                : null}
+            </p>
 
-              {atCapacity ? (
-                <p className="text-[12px] text-[var(--color-muted-foreground)]">
-                  One watch per account. Remove the one below to watch a different address.
-                </p>
-              ) : null}
-
-              {addError ? <FailurePanel outcome={addError} /> : null}
-            </form>
-          </Section>
-
-          <Section
-            title="Watched"
-            action={
-              state.phase === "ready" ? (
-                <button
-                  type="button"
-                  onClick={() => void load()}
-                  className="btn-secondary btn-compact"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                  Refresh
-                </button>
-              ) : null
-            }
-          >
-            {state.phase === "loading" ? (
-              <p className="text-[13px] text-[var(--color-muted-foreground)]">Loading watches.</p>
-            ) : monitors.length === 0 ? (
-              <EmptyState message="Nothing is being watched yet. Add an email above to start." />
-            ) : (
-              <ul className="space-y-2">
-                {monitors.map((m) => {
-                  const Icon = m.scanner_type === "stealer" ? HardDrive : Database
-                  const isSelected = m.id === selectedId
-                  return (
-                    <li key={m.id}>
-                      <div
-                        className={`glass-tile flex flex-wrap items-center gap-3 px-4 py-3 ${
-                          isSelected ? "" : "opacity-90"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setSelectedId(m.id)}
-                          aria-pressed={isSelected}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span className="flex items-center gap-2">
-                            <Bell className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            <span className="truncate text-[13px] text-white">{m.email}</span>
-                            <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                              <Icon className="h-3 w-3" aria-hidden="true" />
-                              {m.scanner_type}
-                            </span>
-                          </span>
-                          <span className="mt-1 block font-mono text-[11px] text-[var(--color-muted-foreground)]">
-                            {m.status} · last run {relativeTime(m.last_run_at)} ·{" "}
-                            {m.total_results_found.toLocaleString("en-US")} found · next{" "}
-                            {untilTime(m.next_run_at)}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void onRemove(m.id)}
-                          disabled={removing === m.id}
-                          aria-busy={removing === m.id}
-                          aria-label={`Remove the watch on ${m.email}`}
-                          className="btn-secondary btn-compact"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            {removeError ? (
-              <p className="mt-3 text-[12px] text-white/75">
-                The watch could not be removed: {removeError}
+            {adding ? (
+              <p className="flex items-center gap-2 font-mono text-[11px] text-white/70">
+                <span aria-hidden="true" className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Provisioning the scanner. Clearing Cloudflare can take about 30 seconds the first
+                time.
               </p>
             ) : null}
-          </Section>
 
-          <Section
-            title={selected ? `Recent alerts for ${selected.email}` : "Recent alerts"}
-            action={
-              selected ? (
-                <button
-                  type="button"
-                  onClick={() => void loadRuns(selected.id)}
-                  aria-busy={runs.phase === "loading"}
-                  className="btn-secondary btn-compact"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                  Refresh
-                </button>
-              ) : null
-            }
-          >
-            {!selected ? (
-              <p className="text-[13px] text-[var(--color-muted-foreground)]">
-                Select a watch to see its scan history.
-              </p>
-            ) : runs.phase === "loading" ? (
-              <p className="text-[13px] text-[var(--color-muted-foreground)]">Loading alerts.</p>
-            ) : runs.phase === "failed" ? (
-              // NOT an empty state. The scanner history could not be read, which
-              // says nothing about whether this address has been exposed.
-              <InlineFailure
-                message={
-                  runs.outcome.kind === "auth"
-                    ? AUTH_MESSAGE
-                    : `The scan history could not be loaded, so this is not a clean result: ${runs.outcome.message}`
-                }
-                onRetry={
-                  runs.outcome.kind === "upgrade" || runs.outcome.kind === "auth"
-                    ? undefined
-                    : () => void loadRuns(selected.id)
+            {addError ? <FailurePanel outcome={addError} /> : null}
+          </form>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+            {/* The watch list. */}
+            <div className="space-y-3">
+              <ListCaption
+                title="Monitored emails"
+                detail={
+                  state.phase === "ready" && monitors.length > 0
+                    ? `${activeCount.toLocaleString("en-US")} active`
+                    : undefined
                 }
               />
-            ) : runs.phase === "ready" && runs.runs.length === 0 ? (
-              <EmptyState message="No scans have finished yet. The scanner runs on its own schedule and the first alert lands after it does." />
-            ) : (
-              <ul className="space-y-2">
-                {runs.phase === "ready"
-                  ? runs.runs.map((run, index) => {
-                      const summary = runSummary(run)
-                      const samples = run.results_sample
-                        .slice(0, 3)
-                        .map(sampleLine)
-                        .filter((line) => line !== "")
-                      return (
-                        <li key={run.uid || index} className="glass-tile px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <ShieldCheck
-                              className="h-3.5 w-3.5 text-[var(--color-muted-foreground)]"
-                              aria-hidden="true"
-                            />
-                            <span className="text-[13px] text-white">{summary.text}</span>
-                            <span className="ml-auto font-mono text-[10px] text-[var(--color-muted-foreground)]">
-                              {relativeTime(run.completed_at ?? run.started_at)}
-                            </span>
-                          </div>
-                          {run.error_message ? (
-                            <p className="mt-1 text-[12px] text-white/70">{run.error_message}</p>
-                          ) : (
-                            samples.map((line, i) => (
-                              <p
-                                key={i}
-                                className="mt-1 truncate font-mono text-[11px] text-[var(--color-muted-foreground)]"
-                              >
-                                {line}
-                              </p>
-                            ))
-                          )}
+
+              {state.phase === "loading" ? (
+                <div className="skeleton h-[68px]" aria-hidden="true" />
+              ) : monitors.length === 0 ? (
+                <EmptyPanel
+                  title={NO_WATCHES_TITLE}
+                  detail="Add an email above to start watching it."
+                />
+              ) : (
+                <ul className="space-y-2">
+                  {monitors.map((m, index) => (
+                    <li key={m.id} className="stagger-item" style={{ "--i": index } as CSSProperties}>
+                      <WatchRow
+                        monitor={m}
+                        selected={m.id === selectedId}
+                        removing={removing === m.id}
+                        onSelect={() => setSelectedId(m.id)}
+                        onRemove={() => void onRemove(m.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {removeError ? (
+                <p className="text-[12px] text-white/75">
+                  The watch could not be removed: {removeError}
+                </p>
+              ) : null}
+            </div>
+
+            {/* The alert history for whichever watch is selected. */}
+            <aside className="glass fade-in flex flex-col overflow-hidden self-start">
+              <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-2.5">
+                <ShieldCheck
+                  className="h-4 w-4 shrink-0 text-[var(--color-muted-foreground)]"
+                  aria-hidden="true"
+                />
+                <h2 className="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
+                    {runsTitle(selected?.email ?? null).caption}
+                  </span>
+                  {runsTitle(selected?.email ?? null).subject ? (
+                    <span className="min-w-0 truncate font-mono text-[11px] text-white/70">
+                      · {runsTitle(selected?.email ?? null).subject}
+                    </span>
+                  ) : null}
+                </h2>
+                {selected ? (
+                  <button
+                    type="button"
+                    onClick={() => void loadRuns(selected.id)}
+                    aria-busy={runs.phase === "loading"}
+                    aria-label="Refresh the scan history"
+                    className="btn-secondary btn-compact shrink-0"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+
+              {!selected ? (
+                <p className="px-4 py-6 text-center text-[13px] text-white/70">
+                  Select a watch to see its scan history.
+                </p>
+              ) : runs.phase === "loading" ? (
+                <div className="space-y-2 p-4" aria-hidden="true">
+                  <div className="skeleton h-10" />
+                  <div className="skeleton h-10" />
+                  <div className="skeleton h-10" />
+                </div>
+              ) : runs.phase === "failed" ? (
+                // NOT an empty state. The scanner history could not be read, which
+                // says nothing about whether this address has been exposed.
+                <div className="p-4">
+                  <InlineFailure
+                    message={
+                      runs.outcome.kind === "auth"
+                        ? AUTH_MESSAGE
+                        : `The scan history could not be loaded, so this is not a clean result: ${runs.outcome.message}`
+                    }
+                    onRetry={
+                      runs.outcome.kind === "upgrade" || runs.outcome.kind === "auth"
+                        ? undefined
+                        : () => void loadRuns(selected.id)
+                    }
+                  />
+                </div>
+              ) : runs.phase === "ready" && runs.runs.length === 0 ? (
+                <p className="px-4 py-6 text-center text-[13px] text-white/70">
+                  No scans have finished yet. The scanner runs on its own schedule and the first
+                  alert lands after it does.
+                </p>
+              ) : (
+                <ul>
+                  {runs.phase === "ready"
+                    ? runs.runs.map((run, index) => (
+                        <li
+                          key={run.uid || index}
+                          className={`stagger-item ${index > 0 ? "border-t border-white/[0.06]" : ""}`}
+                          style={{ "--i": index } as CSSProperties}
+                        >
+                          <RunRow run={run} />
                         </li>
-                      )
-                    })
-                  : null}
-              </ul>
-            )}
-          </Section>
+                      ))
+                    : null}
+                </ul>
+              )}
+            </aside>
+          </div>
         </>
       )}
     </div>

@@ -178,10 +178,19 @@ describe("Shortcuts", () => {
   })
 
   /** Before the settings arrive we do not know, and unknown is not "off". */
-  it("does not claim the shortcut is off before the settings have loaded", () => {
+  it("shows an unknown state, not a bound/unbound claim, before settings load", () => {
+    // view === null is "we have not read the setting yet" (and stays null if the
+    // read threw). Printing "Not bound" or "Turned off" there asserts something
+    // we do not know, over a hotkey that may be working; the Disable button must
+    // also be inert so the user cannot act on the guess.
     const html = render(<ShortcutSection view={null} busy={false} onApply={() => {}} />)
-    expect(html).toContain("Not bound")
+    expect(html).toContain("Checking...")
+    expect(html).not.toContain("Not bound")
     expect(html).not.toContain("Turned off")
+    expect(html).toMatch(/Disable<\/button>/)
+    expect(html).toMatch(/disabled=""[^>]*>[^<]*<[^>]*>?\s*Disable|Disable<\/button>/)
+    // The Disable button carries the disabled attribute.
+    expect(html).toContain("disabled=\"\"")
   })
 })
 

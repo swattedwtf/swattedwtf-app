@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ipc } from "../lib/ipc"
 import {
   NAME_MAX,
+  NOTES_MAX,
   createCase,
   listCases,
   openCase,
@@ -17,9 +18,13 @@ import {
 } from "./api"
 import {
   AssistantPanel,
+  CaseCard,
   CaseList,
   CaseWorkspace,
   Investigations,
+  NO_CASES_TITLE,
+  NotesMarkdown,
+  NotesPanel,
   QUEMLY_URL,
   caseWebUrl,
 } from "./Investigations"
@@ -223,15 +228,117 @@ describe("the screen renders defensively", () => {
       renderToStaticMarkup(<CaseWorkspace id="case_1" onBack={() => {}} />),
       renderToStaticMarkup(<AssistantPanel active={false} caseId="case_1" />),
       renderToStaticMarkup(<AssistantPanel active caseId="case_1" />),
+      renderToStaticMarkup(
+        <CaseCard
+          summary={toSummary(row)}
+          confirming={false}
+          onOpen={() => {}}
+          onAskDelete={() => {}}
+          onCancelDelete={() => {}}
+          onDelete={() => {}}
+        />,
+      ),
+      renderToStaticMarkup(<NotesPanel notes="" view="edit" onView={() => {}} onChange={() => {}} />),
     ]
     for (const html of views) expect(html).not.toContain("—")
   })
 
   it("styles nothing of its own: every surface is a shared glass class", () => {
     const html = renderToStaticMarkup(<CaseList onOpen={() => {}} />)
-    expect(html).toContain("glass-body")
+    expect(html).toContain("glass-tile")
     expect(html).toContain("glass-input")
     expect(html).toContain("btn-primary")
+    // A hex or a hand-mixed background is how sixteen screens drift into
+    // sixteen looks, so neither may appear.
+    expect(html).not.toMatch(/bg-\[#/)
+    expect(html).not.toMatch(/style="[^"]*background/)
+  })
+
+  it("does not claim the account has no cases before the list has loaded", () => {
+    // A shimmer says "still asking". The empty headline says "there are none",
+    // and only one of those is safe to say before the answer arrives.
+    const html = renderToStaticMarkup(<CaseList onOpen={() => {}} />)
+    expect(html).toContain("skeleton")
+    expect(html).not.toContain(NO_CASES_TITLE)
+  })
+})
+
+describe("a case card carries the case's own data", () => {
+  const summary = toSummary({ ...row, notesChars: 4210 })
+
+  const render = (over: Partial<typeof summary> = {}, confirming = false) =>
+    renderToStaticMarkup(
+      <CaseCard
+        summary={{ ...summary, ...over }}
+        confirming={confirming}
+        onOpen={() => {}}
+        onAskDelete={() => {}}
+        onCancelDelete={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+
+  it("shows the name, the state and the size of the notepad", () => {
+    const html = render()
+    expect(html).toContain(summary.name)
+    expect(html).toContain(summary.notesChars.toLocaleString("en-US"))
+    expect(html).toContain(relativeTime(summary.updatedAt))
+  })
+
+  it("says a case has no notes rather than showing it as a zero", () => {
+    expect(render({ notesChars: 0 })).not.toContain("0 characters")
+  })
+
+  it("names the case in its delete control, so two cards are never confused", () => {
+    expect(render()).toContain(`Delete ${summary.name}`)
+  })
+
+  it("asks twice before deleting, because there is no undo", () => {
+    const asked = render({}, true)
+    expect(asked).toContain("Delete for good")
+    expect(asked).toContain("Keep")
+    expect(render()).not.toContain("Delete for good")
+  })
+})
+
+describe("the notepad", () => {
+  it("renders the notes it was given, and offers both views", () => {
+    const notes = "the seller used a burner"
+    const html = renderToStaticMarkup(
+      <NotesPanel notes={notes} view="edit" onView={() => {}} onChange={() => {}} />,
+    )
+    expect(html).toContain(notes)
+    // The counter is what tells a user how close the notepad is to its limit.
+    expect(html).toContain(NOTES_MAX.toLocaleString("en-US"))
+  })
+
+  it("says there is nothing to preview rather than showing an empty card", () => {
+    const html = renderToStaticMarkup(
+      <NotesPanel notes="   " view="preview" onView={() => {}} onChange={() => {}} />,
+    )
+    expect(html).toContain("Nothing to preview yet.")
+  })
+
+  it("formats the markdown the assistant writes into a case", () => {
+    // These notes come back from the web assistant already formatted, so a
+    // preview that showed the source would look like the desktop had lost the
+    // formatting rather than never applied it.
+    const html = renderToStaticMarkup(
+      <NotesMarkdown text={"# Findings\n- **seller** used `burner@example.com`"} />,
+    )
+    expect(html).toContain("<strong")
+    expect(html).toContain("<code")
+    expect(html).toContain("Findings")
+    // The markers themselves are consumed, not printed.
+    expect(html).not.toContain("**seller**")
+  })
+
+  it("never puts note text into the DOM as markup", () => {
+    // A notepad holds whatever a lookup returned, including markup pasted out
+    // of a breach record.
+    const html = renderToStaticMarkup(<NotesMarkdown text={"<img src=x onerror=alert(1)>"} />)
+    expect(html).not.toContain("<img")
+    expect(html).toContain("&lt;img")
   })
 })
 

@@ -113,6 +113,11 @@ export function loadImage(url: string): Promise<string | null> {
  * CJK, and slicing a surrogate pair in half renders a replacement character.
  */
 export function initialsFor(name: string): string {
+  // Coerce a non-string rather than trust the caller. This is a shared
+  // primitive with a "must never throw" contract, and `name.trim()` on an
+  // undefined a future caller forgets to default would throw at an image, which
+  // in this app means a white window. `?? ""` yields "?", the empty-name answer.
+  if (typeof name !== "string") name = ""
   const words = name.trim().split(/\s+/).filter(Boolean)
   const letters: string[] = []
   for (const word of words) {

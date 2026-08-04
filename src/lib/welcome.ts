@@ -23,16 +23,20 @@ function normalizeTelegram(username: string | null): string {
 }
 
 export function resolveWelcomeName(o: WelcomeInput): string {
-  const tg = normalizeTelegram(o.telegram.username)
+  // Optional chaining even though the type says these are present. This runs on
+  // the very first frame after login, at a render site where a throw white-
+  // windows the app with no way back short of a release. A partial Overview
+  // from a server mid-deploy must degrade to "User #n", never crash the reveal.
+  const tg = normalizeTelegram(o.telegram?.username ?? null)
   if (tg) return tg
 
-  const local = o.user.email?.split("@")[0]?.trim()
+  const local = o.user?.email?.split("@")[0]?.trim()
   if (local) return local
 
-  return `User #${o.user.userNumber}`
+  return `User #${o.user?.userNumber ?? ""}`.trimEnd()
 }
 
 /** The reveal shows a quiet nudge when there is no Telegram to greet them by. */
 export function shouldPromptTelegram(o: WelcomeInput): boolean {
-  return normalizeTelegram(o.telegram.username) === ""
+  return normalizeTelegram(o.telegram?.username ?? null) === ""
 }
