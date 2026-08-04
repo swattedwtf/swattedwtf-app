@@ -37,6 +37,31 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # The three version fields and the tag must agree BEFORE anything is
+      # built. v0.1.9 was first cut with tauri.conf.json left at 0.1.8, because
+      # the bump commit staged package.json and Cargo.toml but not it, and
+      # tauri.conf.json is the one the bundler reads. The result was a release
+      # whose tag said 0.1.9 and whose artifacts said 0.1.8, which is invisible
+      # until the files appear and which would have offered 0.1.8 as an update
+      # to someone already running it.
+      - name: Versions must agree with the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "tag=$tag package.json=$pkg tauri.conf.json=$conf Cargo.toml=$cargo"
+          for pair in "package.json:$pkg" "tauri.conf.json:$conf" "Cargo.toml:$cargo"; do
+            name="${pair%%:*}"; value="${pair#*:}"
+            if [ "$value" != "$tag" ]; then
+              echo "::error::$name is $value but the tag is $tag"
+              exit 1
+            fi
+          done
+
+
       # shared-key, not the default per-job key, so this restores what the CI
       # workflow's release-cache jobs left on main. This workflow only runs on
       # tags, and a cache saved under refs/tags/vX is invisible to refs/tags/vY,
