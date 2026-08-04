@@ -35,6 +35,18 @@ function overviewWith(api: Partial<Overview["api"]>): Overview {
 const render = (overview: Overview) => renderToStaticMarkup(<ApiAccess overview={overview} />)
 
 describe("API Access screen", () => {
+  it("says plainly that this is a separate add-on when it is not subscribed", () => {
+    // It used to render "Status: Inactive" over an empty key box, which reads
+    // as a broken feature rather than as one that has not been bought.
+    const html = renderToStaticMarkup(<ApiAccess overview={overviewWith({ active: false })} />)
+    expect(html).toContain("separate add-on")
+    expect(html).toContain("not part of any plan")
+    expect(html).toContain("Get API Access")
+    // The tier list, so the price is visible without leaving the app.
+    expect(html).toContain("1,000 / day")
+    expect(html).toContain("Unlimited")
+  })
+
   it("shows the tier, active status and usage from the overview", () => {
     const html = render(
       overviewWith({
@@ -50,7 +62,8 @@ describe("API Access screen", () => {
     expect(html).toContain("Pro")
     expect(html).toContain("Active")
     expect(html).toContain("42")
-    expect(html).toContain("1000")
+    // Thousands-separated, like every other count in the app.
+    expect(html).toContain("1,000")
   })
 
   it("masks the key by default and never renders it in plain sight", () => {
@@ -64,14 +77,20 @@ describe("API Access screen", () => {
     expect(html).toContain("Copy")
   })
 
-  it("says API access is not enabled when there is no key", () => {
-    const html = render(overviewWith({ active: false, key: null }))
-    expect(html).toContain("API access is not enabled on this account.")
+  it("does not offer a key box at all when the add-on is not bought", () => {
+    const html = renderToStaticMarkup(<ApiAccess overview={overviewWith({ active: false, key: null })} />)
+    expect(html).not.toContain("Reveal")
+    expect(html).toContain("Read the docs")
   })
 
   it("distinguishes an active account with no key yet", () => {
-    const html = render(overviewWith({ active: true, key: null }))
-    expect(html).toContain("No key is provisioned on this account yet.")
+    // Subscribed but keyless is a real state and must not repeat the
+    // not-subscribed pitch.
+    const html = renderToStaticMarkup(
+      <ApiAccess overview={overviewWith({ active: true, key: null, tierLabel: "1,000 / day" })} />,
+    )
+    expect(html).toContain("No key has been generated")
+    expect(html).not.toContain("separate add-on")
   })
 
   it("reads unlimited when no daily limit is set", () => {

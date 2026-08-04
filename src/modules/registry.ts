@@ -11,6 +11,14 @@ import {
   phoneDescriptor as tiktokPhone,
   shareDescriptor as tiktokShare,
 } from "./tiktok"
+import {
+  addressInsightsDescriptor,
+  cobraDescriptor,
+  falconDescriptor,
+  intelxDescriptor,
+  samsungDescriptor,
+  skiptracerDescriptor,
+} from "./tools"
 import type { ModuleDescriptor } from "./types"
 
 /**
@@ -38,6 +46,14 @@ export const MODULES: ModuleDescriptor[] = [
   tiktokEmail,
   roblox,
   robloxScraper,
+  // The Tools group. Six single-call modules that share a provider family and a
+  // Heist-only gate, and one file, exactly as the server keeps them.
+  samsungDescriptor,
+  skiptracerDescriptor,
+  addressInsightsDescriptor,
+  falconDescriptor,
+  intelxDescriptor,
+  cobraDescriptor,
 ]
 
 /**
