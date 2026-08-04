@@ -1,5 +1,6 @@
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
+import { list, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
 import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./ui"
 
@@ -57,9 +58,36 @@ function breachLine(row: Record<string, unknown>): string {
   return parts.join("  ")
 }
 
+const EMPTY_PROFILE: Profile = {
+  id: "",
+  username: "",
+  displayName: "",
+  bio: "",
+  avatarUrl: null,
+  bannerUrl: null,
+  accentColor: null,
+  createdAt: null,
+}
+
 export function Result({ data, partial }: ResultProps) {
-  const d = data as DiscordData
-  const p = d.profile
+  const raw = withDefaults(data, {} as Partial<DiscordData>)
+  const p = withDefaults(raw.profile, EMPTY_PROFILE)
+  const d: DiscordData = {
+    ...(raw as DiscordData),
+    profile: p,
+    badges: list(raw.badges),
+    connections: list(raw.connections),
+    servers: list(raw.servers),
+    breaches: list(raw.breaches),
+    moderation: list(raw.moderation),
+    stealerLogs: list(raw.stealerLogs),
+    alts: list(raw.alts),
+    usernameHistory: raw.usernameHistory === null ? null : list(raw.usernameHistory),
+    messages: withDefaults(raw.messages, { total: 0, items: [] }),
+    vpnAttempts: typeof raw.vpnAttempts === "number" ? raw.vpnAttempts : 0,
+    historyUnavailable: raw.historyUnavailable === true,
+    stealerLocked: raw.stealerLocked === true,
+  }
 
   return (
     <div className="space-y-4">

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { MODULES } from "../modules/registry"
 import { ENABLED_ROUTES, NAV, flattenNav, isEnabled } from "./nav"
 
 describe("NAV", () => {
@@ -57,18 +58,24 @@ describe("NAV", () => {
 
 describe("isEnabled", () => {
   it("enables the built-in screens plus every registered module", () => {
-    // Derived from the registry rather than hand-maintained, so this list grows
-    // exactly when a module ships and the two cannot fall out of step.
-    expect(ENABLED_ROUTES).toEqual(["/dashboard", "/settings", "/discord"])
+    // Derived from the registry, not hand-listed. An earlier version spelled the
+    // expected routes out and had to be edited every time a module shipped,
+    // which tests the editor rather than the derivation.
+    expect(ENABLED_ROUTES).toEqual(["/dashboard", "/settings", ...MODULES.map((m) => m.route)])
     expect(isEnabled("/dashboard")).toBe(true)
     expect(isEnabled("/settings")).toBe(true)
-    expect(isEnabled("/discord")).toBe(true)
+    for (const m of MODULES) expect(isEnabled(m.route), `${m.route} should be enabled`).toBe(true)
   })
 
-  it("still disables a module that has no descriptor yet", () => {
-    expect(isEnabled("/tools/falcon")).toBe(false)
-    expect(isEnabled("/search")).toBe(false)
-    expect(isEnabled("/snapchat")).toBe(false)
+  it("still disables every nav route that has no descriptor yet", () => {
+    const live = new Set(MODULES.map((m) => m.route))
+    const unbuilt = flattenNav()
+      .map((i) => i.href)
+      .filter((h) => !live.has(h) && h !== "/dashboard" && h !== "/settings" && !h.startsWith("http"))
+    // There are always some: the whole Tools group and the streaming screens are
+    // out of scope for this pass.
+    expect(unbuilt.length).toBeGreaterThan(0)
+    for (const href of unbuilt) expect(isEnabled(href), `${href} should be disabled`).toBe(false)
   })
 
   it("does not enable a route merely because it starts with an enabled one", () => {

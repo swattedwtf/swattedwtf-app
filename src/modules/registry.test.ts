@@ -46,9 +46,25 @@ describe("a registered module", () => {
   // itself would otherwise be asserted only vacuously. Registering a stub
   // proves the property that matters: a nav row goes live because a descriptor
   // exists, not because someone remembered to edit a second list.
+  // A route no shipped module owns, chosen at runtime so this keeps proving the
+  // derivation as modules are added instead of colliding with the next one.
+  const freeRoute =
+    flattenNav()
+      .map((i) => i.href)
+      .find(
+        (h) =>
+          !h.startsWith("http") &&
+          // Not a built-in either: /dashboard and /settings are enabled without
+          // a descriptor, so picking one would make the "starts disabled"
+          // precondition false before the stub was ever pushed.
+          h !== "/dashboard" &&
+          h !== "/settings" &&
+          !MODULES.some((m) => m.route === h),
+      ) ?? "/unbuilt"
+
   const stub: ModuleDescriptor = {
     id: "stub",
-    route: "/minecraft",
+    route: freeRoute,
     label: "Stub",
     inputs: [],
     Result: () => null,

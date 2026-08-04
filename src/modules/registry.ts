@@ -1,4 +1,7 @@
 import { descriptor as discord } from "./discord"
+import { descriptor as minecraft } from "./minecraft"
+import { descriptor as snapchat } from "./snapchat"
+import { phoneDescriptor as telegramPhone, userDescriptor as telegram } from "./telegram"
 import type { ModuleDescriptor } from "./types"
 
 /**
@@ -11,7 +14,7 @@ import type { ModuleDescriptor } from "./types"
  * Discord came first and alone: it is the widest module, so building it before
  * anything else proved the shared primitives could carry the rest.
  */
-export const MODULES: ModuleDescriptor[] = [discord]
+export const MODULES: ModuleDescriptor[] = [discord, snapchat, telegram, telegramPhone, minecraft]
 
 /** Screens that exist without a descriptor. */
 const BUILT_IN_ROUTES = ["/dashboard", "/settings"]
