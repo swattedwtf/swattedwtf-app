@@ -1,6 +1,6 @@
 [package]
 name = "swattedwtf-app"
-version = "0.1.7"
+version = "0.1.8"
 description = "Open-source desktop client for swatted.wtf"
 authors = ["swatted.wtf"]
 license = "MIT"
@@ -51,7 +51,11 @@ hex = "0.4"
 [profile.dev]
 debug = "line-tables-only"
 
-# Windows-only: reading the extended window style for the transparency
-# diagnostic. Not used at runtime for anything else.
+# Windows-only: clipping the frameless windows to a rounded region (Gdi), and
+# reading the extended window style for the transparency diagnostic.
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+] }

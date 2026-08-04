@@ -40,6 +40,7 @@ export type WindowDiagnostics = {
   scale_factor: number | null
   background_error: string | null
   layered: boolean | null
+  region_applied: boolean
   ex_style: string | null
   platform: string
 }

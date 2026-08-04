@@ -17,8 +17,11 @@ pub const QUICK_LABEL: &str = "quick";
 /// shortcuts: Ctrl+Space is IME switching, Ctrl+Shift+Space is generally free.
 pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
 
-const WIDTH: f64 = 640.0;
-const HEIGHT: f64 = 116.0;
+/// Sized for the two-row bar in QuickLookup.tsx: a 62px field row over a 40px
+/// footer, plus the frame. Wide enough that a full email or a Discord snowflake
+/// never scrolls the field.
+const WIDTH: f64 = 660.0;
+const HEIGHT: f64 = 124.0;
 
 /// Builds the overlay window, hidden. Called once during setup.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
@@ -55,6 +58,12 @@ pub fn show(app: &AppHandle) {
 
     if let Some(win) = app.get_webview_window(QUICK_LABEL) {
         let _ = win.center();
+        // Re-cut before it is visible, not after: the window may have been
+        // created on a monitor with a different scale factor from the one it is
+        // now centred on, and a region cut for the wrong DPI would show as a
+        // clipped or square-cornered frame for the frame or two it takes the
+        // resize events to arrive.
+        crate::window_chrome::round_corners(&win, crate::window_chrome::QUICK_RADIUS);
         let _ = win.show();
         let _ = win.set_focus();
     }

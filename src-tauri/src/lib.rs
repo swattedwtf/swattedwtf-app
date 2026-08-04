@@ -71,11 +71,15 @@ pub fn run() {
             app.manage(AppState { client });
             app.manage(updater::PendingUpdate::default());
 
-            // Rounded corners need the webview background cleared as well as
-            // the window being transparent; WebView2 paints its own background
-            // beneath the HTML and does not inherit the window's alpha.
+            // Two separate things, both needed. force_transparent clears the
+            // background WebView2 paints beneath the HTML (it does not inherit
+            // the window's alpha), which is what lets the page's antialiased
+            // curve show. round_corners clips the window itself, which is what
+            // makes the shape hold on machines that never granted per-pixel
+            // alpha in the first place.
             if let Some(main) = app.get_webview_window("main") {
                 window_chrome::force_transparent(&main);
+                window_chrome::round_corners(&main, window_chrome::MAIN_RADIUS);
             }
 
             // The overlay is built once, hidden, so the hotkey only has to
@@ -83,6 +87,7 @@ pub fn run() {
             let _ = quick::create(app.handle());
             if let Some(overlay) = app.get_webview_window(quick::QUICK_LABEL) {
                 window_chrome::force_transparent(&overlay);
+                window_chrome::round_corners(&overlay, window_chrome::QUICK_RADIUS);
             }
             register_quick_shortcut(app.handle());
 
@@ -113,6 +118,32 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 window.app_handle().exit(0);
+            }
+
+            // A clip region is measured in physical pixels and is not rescaled
+            // for us, so a window that resized or moved to a monitor with a
+            // different DPI is left wearing a region cut for its old size: the
+            // login screen's 520x620 shape would still be clipping the 1180x760
+            // dashboard, cropping most of it away. Recut on every event that can
+            // change either number.
+            //
+            // Maximizing arrives as a Resized, which is also where the region is
+            // dropped for a maximized window. Moved is deliberately NOT in this
+            // list: it fires on every frame of a window drag, and recutting the
+            // region forces a redraw each time, so the window would flicker for
+            // as long as it was being moved. Crossing onto a monitor with a
+            // different DPI raises ScaleFactorChanged, followed by a Resized.
+            let recut = matches!(
+                event,
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+            );
+
+            if recut {
+                if let Some(radius) = window_chrome::radius_for(window.label()) {
+                    if let Some(win) = window.app_handle().get_webview_window(window.label()) {
+                        window_chrome::round_corners(&win, radius);
+                    }
+                }
             }
         })
         .run(tauri::generate_context!())
