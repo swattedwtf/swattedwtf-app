@@ -38,8 +38,8 @@ export function BadgeRow({
           aria-label={badge.label}
           className={
             badge.iconUrl
-              ? "inline-flex items-center justify-center rounded-lg bg-white/[0.06] p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
-              : "inline-flex items-center rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+              ? "glass-tile inline-flex items-center justify-center p-1.5"
+              : "glass-tile inline-flex items-center rounded-full px-2.5 py-1 text-[11px] text-white/80"
           }
         >
           {badge.iconUrl ? (

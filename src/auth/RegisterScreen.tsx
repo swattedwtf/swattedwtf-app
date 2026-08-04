@@ -66,7 +66,7 @@ export function RegisterScreen({
             if (e.key === "Enter") void submit()
           }}
           placeholder="you@example.com"
-          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-sm shadow-[inset_0_1px_2px_0_rgba(0,0,0,0.45)] outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
+          className="mt-2 w-full select-text glass-input px-4 py-3 text-sm outline-none"
         />
         <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
           Optional, used only for account recovery.

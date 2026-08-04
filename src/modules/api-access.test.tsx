@@ -37,21 +37,22 @@ const render = (overview: Overview) => renderToStaticMarkup(<ApiAccess overview=
 describe("API Access screen", () => {
   it("says plainly that this is a separate add-on when it is not subscribed", () => {
     // It used to render "Status: Inactive" over an empty key box, which reads
-    // as a broken feature rather than as one that has not been bought.
+    // as a broken feature rather than as one that has not been bought. This is
+    // the web's own wording, so the two pages say the same thing.
     const html = renderToStaticMarkup(<ApiAccess overview={overviewWith({ active: false })} />)
-    expect(html).toContain("separate add-on")
-    expect(html).toContain("not part of any plan")
+    expect(html).toContain("/ API Access")
+    expect(html).toContain("Programmatic access to every Swatted.wtf lookup")
+    expect(html).toContain("No active API Access")
+    expect(html).toContain("Subscribe to API Access to generate keys")
     expect(html).toContain("Get API Access")
-    // The tier list, so the price is visible without leaving the app.
-    expect(html).toContain("1,000 / day")
-    expect(html).toContain("Unlimited")
+    expect(html).toContain("Read the docs")
   })
 
   it("shows the tier, active status and usage from the overview", () => {
     const html = render(
       overviewWith({
         active: true,
-        tierLabel: "Pro",
+        tierLabel: "5,000 / day",
         usedToday: 42,
         dailyLimit: 1000,
         expiresAt: "2025-01-01T00:00:00Z",
@@ -59,11 +60,13 @@ describe("API Access screen", () => {
       }),
     )
     expect(html).toContain("API Access")
-    expect(html).toContain("Pro")
-    expect(html).toContain("Active")
+    expect(html).toContain("5,000 / day")
     expect(html).toContain("42")
     // Thousands-separated, like every other count in the app.
     expect(html).toContain("1,000")
+    expect(html).toContain("Renews")
+    // The sales pitch belongs only to the unsubscribed state.
+    expect(html).not.toContain("No active API Access")
   })
 
   it("masks the key by default and never renders it in plain sight", () => {
@@ -94,8 +97,8 @@ describe("API Access screen", () => {
   })
 
   it("reads unlimited when no daily limit is set", () => {
-    const html = render(overviewWith({ active: true, dailyLimit: null }))
-    expect(html).toContain("Unlimited")
+    const html = render(overviewWith({ active: true, dailyLimit: null, key: "k" }))
+    expect(html).toContain("unlimited")
   })
 
   it("does not throw when the api section is absent", () => {

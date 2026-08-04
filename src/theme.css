@@ -25,7 +25,10 @@
   --mark-tld: #404040;
 
   /* Liquid glass. */
-  --glass-filter: blur(22px) saturate(1.8) brightness(1.06) contrast(1.03);
+  /* Liquid glass. Saturation is what makes it read as glass rather than as a
+     grey card: it pulls colour out of whatever is behind and lets it bloom
+     through the surface. Blur alone just looks like fog. */
+  --glass-filter: blur(30px) saturate(2.1) brightness(1.08) contrast(1.04);
   --glass-edge: oklch(1 0 0 / 0.2);
 }
 
@@ -136,7 +139,7 @@ textarea {
   overflow: hidden;
   border-radius: 15px;
   background: linear-gradient(180deg, rgba(21, 21, 21, 0.72), rgba(11, 11, 11, 0.78));
-  backdrop-filter: blur(22px) saturate(1.8) brightness(1.06);
+  backdrop-filter: var(--glass-filter);
   padding: 20px;
 }
 
@@ -168,6 +171,65 @@ textarea {
 @supports not (backdrop-filter: blur(1px)) {
   .glass { background: linear-gradient(180deg, #151515, #0b0b0b); }
   .glass > .glass-body { background: linear-gradient(180deg, #151515, #0b0b0b); }
+}
+
+/* A sub-surface: tiles, chips, wells and empty states inside a .glass panel.
+   Lighter than .glass because it sits ON one, and a second full-strength blur
+   over an already-blurred backdrop reads as milk rather than as glass. The
+   1px top highlight is the whole trick: it is what makes an edge look like it
+   catches light instead of like a border. */
+.glass-tile {
+  position: relative;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022));
+  backdrop-filter: blur(12px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 8px 24px -18px rgba(0, 0, 0, 0.9);
+}
+
+/* Interactive version: lifts on hover the way the stat cards do. */
+.glass-tile-hover {
+  transition:
+    background 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.glass-tile-hover:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.11),
+    0 10px 28px -18px rgba(0, 0, 0, 0.9);
+}
+
+/* Text fields, on the same material. A flat dark rectangle inside a glass panel
+   was the one place the app stopped looking like itself. Recessed rather than
+   raised: the highlight is on the BOTTOM edge, which is what reads as a well
+   rather than as a tile sitting on top. */
+.glass-input {
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(10px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 3px 0 rgba(0, 0, 0, 0.45),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: #fff;
+  transition: box-shadow 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.glass-input::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.glass-input:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 3px 0 rgba(0, 0, 0, 0.45),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.10),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 /* ---- Buttons ------------------------------------------------------------

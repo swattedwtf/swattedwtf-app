@@ -179,7 +179,7 @@ export function RemoteImage({
     <span
       role="img"
       aria-label={alt}
-      className={`inline-flex select-none items-center justify-center bg-white/[0.06] text-[var(--color-muted-foreground)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] ${className}`}
+      className={`glass-tile inline-flex select-none items-center justify-center text-[var(--color-muted-foreground)] ${className}`}
     >
       {initialsFor(name ?? alt)}
     </span>

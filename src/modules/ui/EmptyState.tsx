@@ -6,7 +6,7 @@
  */
 export function EmptyState({ message }: { message: string }) {
   return (
-    <p className="rounded-lg bg-white/[0.02] px-4 py-6 text-center text-[13px] text-[var(--color-muted-foreground)]">
+    <p className="glass-tile px-4 py-6 text-center text-[13px] text-[var(--color-muted-foreground)]">
       {message}
     </p>
   )

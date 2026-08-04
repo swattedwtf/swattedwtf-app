@@ -66,7 +66,7 @@ export function TwoFactorScreen({
             if (e.key === "Enter") void submit()
           }}
           placeholder="000000"
-          className="mt-2 w-full select-text rounded-lg border border-[var(--color-border)] bg-[var(--secondary)] px-4 py-3 text-center font-mono text-lg tabular-nums tracking-[0.3em] shadow-[inset_0_1px_2px_0_rgba(0,0,0,0.45)] outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
+          className="mt-2 w-full select-text glass-input px-4 py-3 text-center font-mono text-lg tabular-nums tracking-[0.3em] outline-none"
         />
         <p className="mt-2 text-center text-xs text-[var(--color-muted-foreground)]">
           Enter the 6-digit code from your authenticator app.

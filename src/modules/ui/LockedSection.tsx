@@ -21,7 +21,7 @@ export function LockedSection({
   actionLabel?: string
 }) {
   return (
-    <div className="rounded-lg bg-white/[0.02] px-4 py-6 text-center">
+    <div className="glass-tile px-4 py-6 text-center">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
         {title}
       </p>
