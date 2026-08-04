@@ -154,3 +154,20 @@ describe("failure caching has a TTL", () => {
     __setClock(() => Date.now())
   })
 })
+
+describe("inline images", () => {
+  it("passes a data URL straight through without asking Rust", async () => {
+    // Telegram embeds avatars as data URLs. Routing them through fetch_image,
+    // which only accepts our own image proxy, blanked every Telegram avatar.
+    fetchImage.mockReset()
+    const inline = "data:image/jpeg;base64,AAAA"
+    expect(await loadImage(inline)).toBe(inline)
+    expect(fetchImage).not.toHaveBeenCalled()
+  })
+
+  it("still refuses a non-image data URL", async () => {
+    fetchImage.mockReset()
+    fetchImage.mockRejectedValue(new Error("blocked"))
+    expect(await loadImage("data:text/html,<script>1</script>")).toBe(null)
+  })
+})

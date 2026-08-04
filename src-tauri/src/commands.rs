@@ -317,11 +317,27 @@ pub async fn window_diagnostics(
     Ok(crate::window_chrome::diagnostics(&window))
 }
 
-/// Opens a URL in the user's browser.
+/// Opens a URL in the user's DEFAULT BROWSER, never in the webview.
 ///
-/// Allowlisted by ORIGIN, not by prefix: a bare `starts_with("https://github.com")`
-/// would also match `https://github.com.evil.test/...`, so each candidate is
-/// parsed and its host compared exactly.
+/// The scheme is the control here, and the host deliberately is not.
+///
+/// It used to allowlist three hosts, which was wrong for what this does. Every
+/// result screen renders links a lookup produced: a Roblox profile, an Instagram
+/// account, a Falcon result on an arbitrary site. All of them were refused, and
+/// every call site swallows the rejection, so every "Open profile" button in the
+/// app was silently inert. Widening the list was not possible either, because a
+/// provider can legitimately return any host.
+///
+/// Handing an https URL to the user's browser is what a link does in any
+/// application: it opens somewhere with a visible address bar, outside our
+/// process, with none of our state. The threat the allowlist was written for is
+/// a hostile URL opening INSIDE the app, and that is not what this command does.
+///
+/// What is still refused is every other scheme. `file:` reads the disk,
+/// `javascript:` is a script, and a custom scheme can launch whatever
+/// application the operating system has registered for it, which is a genuine
+/// escalation from "opened a web page". Those are the cases worth blocking, and
+/// they are blocked.
 #[tauri::command]
 pub async fn open_external(app: AppHandle, url: String) -> Result<(), AppError> {
     let parsed = url::Url::parse(&url).map_err(|_| AppError::Internal("invalid url".into()))?;
@@ -329,18 +345,9 @@ pub async fn open_external(app: AppHandle, url: String) -> Result<(), AppError> 
         return Err(AppError::Internal("blocked external url".into()));
     }
 
-    let api_host = url::Url::parse(crate::config::api_base())
-        .ok()
-        .and_then(|u| u.host_str().map(str::to_owned));
-
-    let allowed = match parsed.host_str() {
-        Some(host) => {
-            Some(host) == api_host.as_deref() || host == "t.me" || host == "github.com"
-        }
-        None => false,
-    };
-
-    if !allowed {
+    // A URL with no host is not a web page: `https:///x` and the opaque forms
+    // have nothing to open.
+    if parsed.host_str().is_none_or(str::is_empty) {
         return Err(AppError::Internal("blocked external url".into()));
     }
 
@@ -354,43 +361,57 @@ pub async fn open_external(app: AppHandle, url: String) -> Result<(), AppError> 
 
 #[cfg(test)]
 mod tests {
-    /// The allowlist logic, extracted so it can be tested without an AppHandle.
-    fn is_allowed(url: &str, api_base: &str) -> bool {
+    /// The scheme check, extracted so it can be tested without an AppHandle.
+    fn is_allowed(url: &str) -> bool {
         let Ok(parsed) = url::Url::parse(url) else { return false };
         if parsed.scheme() != "https" {
             return false;
         }
-        let api_host = url::Url::parse(api_base).ok().and_then(|u| u.host_str().map(str::to_owned));
-        match parsed.host_str() {
-            Some(host) => Some(host) == api_host.as_deref() || host == "t.me" || host == "github.com",
-            None => false,
+        !parsed.host_str().is_none_or(str::is_empty)
+    }
+
+    #[test]
+    fn opens_the_hosts_a_lookup_result_actually_links_to() {
+        // These were ALL refused by the old three-host allowlist, so every
+        // "Open profile" button in the app was silently inert.
+        for url in [
+            "https://swattedw.tf/dashboard/plans",
+            "https://t.me/swatted_bot",
+            "https://github.com/swattedwtf/swattedwtf-app/releases",
+            "https://www.roblox.com/users/1/profile",
+            "https://www.instagram.com/instagram/",
+            "https://www.tiktok.com/@tiktok",
+            "https://www.snapchat.com/add/team",
+            "https://some-provider-result.example.org/profile/42",
+        ] {
+            assert!(is_allowed(url), "{url} should open in the browser");
         }
     }
 
-    const BASE: &str = "https://swattedw.tf";
-
+    /// The scheme is the control. A custom scheme can launch whatever the OS
+    /// has registered for it, which is an escalation from "opened a web page".
     #[test]
-    fn allows_the_api_host_the_bot_and_github() {
-        assert!(is_allowed("https://swattedw.tf/dashboard/plans", BASE));
-        assert!(is_allowed("https://t.me/swatted_bot", BASE));
-        assert!(is_allowed("https://github.com/swattedwtf/swattedwtf-app/releases", BASE));
+    fn refuses_every_scheme_that_is_not_https() {
+        for url in [
+            "http://swattedw.tf/x",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "data:text/html,<script>1</script>",
+            "vbscript:msgbox(1)",
+            "ms-msdt:/id",
+            "steam://run/1",
+            "smb://host/share",
+        ] {
+            assert!(!is_allowed(url), "{url} must be refused");
+        }
     }
 
     #[test]
-    fn rejects_a_lookalike_host() {
-        assert!(!is_allowed("https://github.com.evil.test/x", BASE));
-        assert!(!is_allowed("https://swattedw.tf.evil.test/x", BASE));
-    }
-
-    #[test]
-    fn rejects_other_schemes() {
-        assert!(!is_allowed("http://swattedw.tf/x", BASE));
-        assert!(!is_allowed("file:///etc/passwd", BASE));
-        assert!(!is_allowed("javascript:alert(1)", BASE));
-    }
-
-    #[test]
-    fn rejects_an_unrelated_host() {
-        assert!(!is_allowed("https://example.com", BASE));
+    fn refuses_something_that_is_not_a_url_at_all() {
+        assert!(!is_allowed("not a url"));
+        assert!(!is_allowed(""));
+        // Note: the url crate normalises `https:///x` to a host of "x" rather
+        // than rejecting it, so that spelling is a real URL, not a hostless one.
+        // The host check here is for the opaque forms.
     }
 }

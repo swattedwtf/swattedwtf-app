@@ -68,6 +68,12 @@ export function cachedImage(url: string): string | null {
  * as a console error on a perfectly normal expired avatar.
  */
 export function loadImage(url: string): Promise<string | null> {
+  // Already inline. Telegram's resolver downloads avatars itself and embeds
+  // them, so there is nothing to fetch and nothing for Rust to validate: the
+  // bytes ARE the payload, and the server has already shape-checked them.
+  // Sending these through fetch_image only produced "blocked image url".
+  if (url.startsWith("data:image/")) return Promise.resolve(url)
+
   const hit = cache.get(url)
   if (hit !== undefined) return Promise.resolve(hit)
   if (failedRecently(url)) return Promise.resolve(null)

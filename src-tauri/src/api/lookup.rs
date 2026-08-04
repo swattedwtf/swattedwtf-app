@@ -106,11 +106,21 @@ pub fn is_api_origin(url: &str) -> bool {
 pub fn data_url(content_type: &str, bytes: &[u8]) -> Result<String, AppError> {
     let mime = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
 
-    if !mime.starts_with("image/") || mime.len() <= "image/".len() {
+    // Raster types only, matching the server proxy exactly. `starts_with("image/")`
+    // admits image/svg+xml, and an SVG is a scriptable document; the server
+    // refuses it for that reason and the client should not be the laxer of the
+    // two on a check they both perform.
+    const ALLOWED: [&str; 7] = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/webp",
+        "image/avif",
+        "image/bmp",
+    ];
+    if !ALLOWED.contains(&mime.as_str()) {
         return Err(AppError::Internal(format!("not an image ({mime})")));
-    }
-    if !mime.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'.' | b'+' | b'-')) {
-        return Err(AppError::Internal("unsupported image type".into()));
     }
     if bytes.len() > MAX_IMAGE_BYTES {
         return Err(AppError::Internal("image too large".into()));
@@ -128,22 +138,116 @@ pub async fn lookup(
     client.post_json(LOOKUP_PATH, &LookupBody { module, input: &input }).await
 }
 
-/// Fetches an image from our own origin and returns it as a `data:` URL.
-pub async fn fetch_image(client: &ApiClient, url: &str) -> Result<String, AppError> {
-    if !is_api_origin(url) {
-        // Deliberately not echoing the URL: the message is user-visible and the
-        // caller already knows what it asked for.
-        return Err(AppError::Internal("blocked image url".into()));
-    }
+/// The only two paths an image may be fetched from.
+///
+/// The server rewrites every image URL in a lookup payload onto one of these, so
+/// nothing else is a legitimate image source. Checking the PATH as well as the
+/// origin matters: an origin-only check made this an authenticated same-origin
+/// GET primitive that a compromised webview could aim at any endpoint on our
+/// own site and read back anything served as an image.
+const IMAGE_PATHS: [&str; 2] = ["/api/desktop/image", "/api/instagram/image"];
 
-    let (content_type, bytes) = client.get_bytes(url, MAX_IMAGE_BYTES).await?;
+/// Resolves what the payload gave us into an absolute URL we are willing to
+/// fetch, or None.
+///
+/// Accepts a RELATIVE path, which is what `toDesktopImageUrl` actually emits.
+/// Requiring an absolute URL here is why every avatar, badge and thumbnail in
+/// the app silently fell back to its initials placeholder: the two halves were
+/// each tested in isolation and never against each other.
+pub fn resolve_image_url(url: &str) -> Option<String> {
+    let base = url::Url::parse(api_base()).ok()?;
+    // `join` resolves a relative path against the base and leaves an absolute
+    // URL untouched, so one call covers both shapes.
+    let parsed = base.join(url).ok()?;
+
+    if parsed.scheme() != base.scheme() {
+        return None;
+    }
+    if parsed.host_str()? != base.host_str()? {
+        return None;
+    }
+    if parsed.port_or_known_default() != base.port_or_known_default() {
+        return None;
+    }
+    if !IMAGE_PATHS.contains(&parsed.path()) {
+        return None;
+    }
+    Some(parsed.to_string())
+}
+
+/// Fetches an image from our own image proxy and returns it as a `data:` URL.
+pub async fn fetch_image(client: &ApiClient, url: &str) -> Result<String, AppError> {
+    // Deliberately not echoing the URL: the message is user-visible and the
+    // caller already knows what it asked for.
+    let target = resolve_image_url(url).ok_or_else(|| AppError::Internal("blocked image url".into()))?;
+
+    let (content_type, bytes) = client.get_bytes(&target, MAX_IMAGE_BYTES).await?;
     data_url(&content_type, &bytes)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::error_from;
-    use super::{data_url, is_api_origin, MAX_IMAGE_BYTES};
+    use super::{data_url, error_from, resolve_image_url};
+
+    /// The bug this exists to prevent: the server emits a RELATIVE proxy path,
+    /// and requiring an absolute URL meant every avatar, badge and thumbnail in
+    /// the app fell back to its initials placeholder. Each half was tested on
+    /// its own and never against the other.
+    #[test]
+    fn a_relative_proxy_path_is_what_the_payload_actually_contains() {
+        let out = resolve_image_url("/api/desktop/image?u=https%3A%2F%2Fcdn.discordapp.com%2Fa.png")
+            .expect("a relative proxy path must resolve");
+        assert!(out.starts_with("https://"), "must become absolute: {out}");
+        assert!(out.contains("/api/desktop/image"));
+
+        assert!(resolve_image_url("/api/instagram/image?u=x").is_some());
+    }
+
+    #[test]
+    fn an_absolute_url_on_our_own_proxy_is_accepted() {
+        assert!(resolve_image_url("https://swattedw.tf/api/desktop/image?u=x").is_some());
+    }
+
+    /// Origin alone was not enough: it made this an authenticated same-origin
+    /// GET a compromised webview could aim at any endpoint on our own site.
+    #[test]
+    fn any_path_other_than_the_two_image_proxies_is_refused() {
+        for url in [
+            "/api/desktop/lookup",
+            "/api/desktop/overview",
+            "https://swattedw.tf/api/desktop/lookup",
+            "/dashboard",
+        ] {
+            assert!(resolve_image_url(url).is_none(), "{url} must be refused");
+        }
+    }
+
+    #[test]
+    fn another_origin_is_refused_however_it_is_spelled() {
+        for url in [
+            "https://swattedw.tf.evil.test/api/desktop/image",
+            "https://evil.test/api/desktop/image",
+            "http://swattedw.tf/api/desktop/image",
+            "https://swattedw.tf:8443/api/desktop/image",
+            "//evil.test/api/desktop/image",
+            "data:image/png;base64,AAAA",
+            "javascript:alert(1)",
+        ] {
+            assert!(resolve_image_url(url).is_none(), "{url} must be refused");
+        }
+    }
+
+    /// An SVG is a scriptable document. The server proxy refuses it explicitly,
+    /// and the client should not be the laxer of the two on the same check.
+    #[test]
+    fn an_svg_is_not_an_image_for_our_purposes() {
+        assert!(data_url("image/svg+xml", b"<svg/>").is_err());
+        assert!(data_url("image/svg+xml; charset=utf-8", b"<svg/>").is_err());
+        assert!(data_url("text/html", b"<h1>x</h1>").is_err());
+        assert!(data_url("image/png", b"PNG").is_ok());
+        assert!(data_url("IMAGE/PNG", b"PNG").is_ok());
+    }
+    use super::{is_api_origin, MAX_IMAGE_BYTES};
 
     #[test]
     fn a_402_carries_its_code_so_the_ui_can_branch() {

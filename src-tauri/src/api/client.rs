@@ -25,6 +25,11 @@ const SESSION_COOKIE: &str = "parallax_session";
 
 pub struct ApiClient {
     http: reqwest::Client,
+    /// Image fetches only. Identical to `http` except that it REFUSES to follow
+    /// redirects: `fetch_image` validates the URL once, and reqwest's default
+    /// policy of ten hops would leave that check binding only the first one. The
+    /// server-side proxy sets `redirect: "error"` for the same reason.
+    images: reqwest::Client,
     jar: Arc<CookieStoreMutex>,
     store: SessionStore,
 }
@@ -38,7 +43,14 @@ impl ApiClient {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| AppError::Internal(e.to_string()))?;
-        Ok(Self { http, jar, store })
+        let images = reqwest::Client::builder()
+            .cookie_provider(jar.clone())
+            .user_agent(concat!("swattedwtf-app/", env!("CARGO_PKG_VERSION")))
+            .timeout(std::time::Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        Ok(Self { http, images, jar, store })
     }
 
     fn url(&self, path: &str) -> String {
@@ -120,7 +132,7 @@ impl ApiClient {
         max_bytes: usize,
     ) -> Result<(String, Vec<u8>), AppError> {
         let mut resp = self
-            .http
+            .images
             .get(url)
             .send()
             .await
