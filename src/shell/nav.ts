@@ -3,10 +3,16 @@
  * repo.
  *
  * The whole tree renders so users can see what the platform offers, but only
- * ENABLED_ROUTES are interactive in v1. The rest show a "soon" pill. That is a
+ * the enabled routes are interactive. The rest show a "soon" pill. That is a
  * deliberate product choice: hiding them would make the app look far smaller
  * than the platform actually is.
+ *
+ * Which routes those are is NOT maintained here any more. It is derived from
+ * the module registry, so a row goes live exactly when its module gains a
+ * descriptor and a hand-edited list can never disagree with what the app can
+ * actually render.
  */
+import { enabledRoutes } from "../modules/registry"
 
 export type NavItem = {
   label: string
@@ -17,8 +23,14 @@ export type NavItem = {
 
 export type NavGroup = { label: string; items: NavItem[] }
 
-/** Routes with a real screen behind them. Everything else renders disabled. */
-export const ENABLED_ROUTES = ["/dashboard", "/settings"] as const
+/**
+ * Routes with a real screen behind them. Everything else renders disabled.
+ *
+ * Derived from the registry, not written by hand. Kept as an export because it
+ * reads better than a function call in tests and in the Sidebar's comments;
+ * `isEnabled` is what code should actually use.
+ */
+export const ENABLED_ROUTES: readonly string[] = enabledRoutes()
 
 export const NAV: NavGroup[] = [
   {
@@ -108,9 +120,12 @@ export const NAV: NavGroup[] = [
 /**
  * Exact match, never a prefix test. `/dashboard/evil` must not inherit
  * `/dashboard`'s enabled state.
+ *
+ * Reads the registry on every call rather than the snapshot above, so a module
+ * registered after this module was first evaluated is still honoured.
  */
 export function isEnabled(href: string): boolean {
-  return (ENABLED_ROUTES as readonly string[]).includes(href)
+  return enabledRoutes().includes(href)
 }
 
 /** Every leaf in the tree. Parents that exist only to group children are omitted. */

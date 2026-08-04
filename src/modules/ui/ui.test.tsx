@@ -1,0 +1,110 @@
+import { describe, expect, it, vi } from "vitest"
+import { renderToStaticMarkup } from "react-dom/server"
+
+import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./index"
+
+vi.mock("../../lib/ipc", () => ({ ipc: { openExternal: vi.fn(), fetchImage: vi.fn() } }))
+
+/**
+ * A smoke pass over the shared vocabulary. These primitives are rendered with
+ * whatever the providers happened to return, which for these upstreams routinely
+ * means empty lists and absent fields, so "does not throw and does not render a
+ * blank next to a label" is the property that matters.
+ */
+describe("Section", () => {
+  it("renders its caption and body on the panel material", () => {
+    const html = renderToStaticMarkup(
+      <Section title="Servers">
+        <p>body</p>
+      </Section>,
+    )
+    expect(html).toContain("Servers")
+    expect(html).toContain("body")
+    expect(html).toContain("glass-body")
+  })
+})
+
+describe("FieldGrid", () => {
+  it("labels an unanswered field instead of leaving a blank beside it", () => {
+    const html = renderToStaticMarkup(
+      <FieldGrid fields={[{ label: "Email", value: null }, { label: "Handle", value: "bob" }]} />,
+    )
+    expect(html).toContain("Not reported")
+    expect(html).toContain("bob")
+  })
+
+  it("can drop unanswered fields instead", () => {
+    const html = renderToStaticMarkup(
+      <FieldGrid hideEmpty fields={[{ label: "Email", value: "" }]} />,
+    )
+    expect(html).toBe("")
+  })
+})
+
+describe("BadgeRow", () => {
+  it("renders each badge as a pill", () => {
+    const html = renderToStaticMarkup(<BadgeRow badges={[{ label: "Nitro" }, { label: "Staff" }]} />)
+    expect(html).toContain("Nitro")
+    expect(html).toContain("Staff")
+  })
+
+  it("says so when there are none, rather than rendering an empty row", () => {
+    expect(renderToStaticMarkup(<BadgeRow badges={[]} empty="No badges" />)).toContain("No badges")
+  })
+
+  it("renders a badge whose icon has not resolved as its label alone", () => {
+    const html = renderToStaticMarkup(
+      <BadgeRow badges={[{ label: "Nitro", iconUrl: "https://swattedw.tf/api/desktop/image?u=1" }]} />,
+    )
+    expect(html).toContain("Nitro")
+    expect(html).not.toContain("<img")
+  })
+})
+
+describe("ProfileCard", () => {
+  it("renders the name, the subtitle and the headline fields", () => {
+    const html = renderToStaticMarkup(
+      <ProfileCard
+        name="Bob Ross"
+        subtitle="@bobross"
+        avatarUrl={null}
+        meta={[{ label: "Created", value: "2019" }]}
+      />,
+    )
+    expect(html).toContain("Bob Ross")
+    expect(html).toContain("@bobross")
+    expect(html).toContain("Created")
+    expect(html).toContain("2019")
+  })
+
+  it("falls back to initials when there is no avatar", () => {
+    const html = renderToStaticMarkup(<ProfileCard name="Bob Ross" avatarUrl={null} />)
+    expect(html).toContain("BR")
+    expect(html).not.toContain("<img")
+  })
+})
+
+describe("LockedSection and EmptyState", () => {
+  it("distinguishes 'you cannot see this' from 'there is nothing here'", () => {
+    const locked = renderToStaticMarkup(
+      <LockedSection title="Stealer logs" message="Heist unlocks stealer logs." />,
+    )
+    expect(locked).toContain("Heist unlocks stealer logs.")
+    expect(locked).toContain("View plans")
+
+    const empty = renderToStaticMarkup(<EmptyState message="No records found." />)
+    expect(empty).toContain("No records found.")
+    expect(empty).not.toContain("<button")
+  })
+
+  it("uses no em dashes", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <LockedSection title="t" message="m" />
+        <EmptyState message="m" />
+        <FieldGrid fields={[{ label: "Email", value: null }]} />
+      </>,
+    )
+    expect(html).not.toContain("—")
+  })
+})

@@ -10,6 +10,8 @@ import { LoginScreen } from "./auth/LoginScreen"
 import { RegisterScreen } from "./auth/RegisterScreen"
 import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
+import { ModuleScreen } from "./modules/ModuleScreen"
+import { moduleForRoute } from "./modules/registry"
 import { Settings } from "./settings/Settings"
 import { Walkthrough } from "./onboarding/Walkthrough"
 import { hasSeenWalkthrough } from "./lib/onboarding"
@@ -211,6 +213,11 @@ export default function App() {
         changed: state.changedFiles,
         manifest_version: "",
       }
+      // A lookup module owns its route outright. Checked before the built-in
+      // screens so a module can never be shadowed by the dashboard fallback,
+      // and the Shell's own `key={route}` remounts it, so switching modules
+      // starts from an empty form rather than the previous module's answer.
+      const module = moduleForRoute(route)
       // Sits over the shell rather than replacing it, so the app is already
       // built and warm behind the walkthrough and dismissing it reveals a
       // loaded dashboard rather than another loading state.
@@ -218,7 +225,9 @@ export default function App() {
         <>
           {showWalkthrough && <Walkthrough onDone={() => setShowWalkthrough(false)} />}
           <Shell route={route} onNavigate={setRoute}>
-            {route === "/settings" ? (
+            {module ? (
+              <ModuleScreen descriptor={module} />
+            ) : route === "/settings" ? (
               <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
             ) : (
               <Home overview={overview} />
