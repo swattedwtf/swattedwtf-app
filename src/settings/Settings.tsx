@@ -75,7 +75,8 @@ function Note({ children }: { children: ReactNode }) {
 }
 
 /** Balance, in the currency the server bills in. */
-export function formatCents(cents: number): string {
+export function formatCents(cents: number | null | undefined): string {
+  if (typeof cents !== "number" || !Number.isFinite(cents)) return ""
   return `$${(cents / 100).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -89,6 +90,26 @@ async function openWeb(url: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** Defaults for a plan the server described only partly. */
+const EMPTY_PLAN = {
+  id: "",
+  label: "",
+  monthlyLimit: 0,
+  since: "",
+  balanceCents: 0,
+  status: "",
+  dailyLimit: null as number | null,
+}
+
+/** Defaults for usage the server described only partly. */
+const EMPTY_USAGE = {
+  todayCount: 0,
+  monthCount: 0,
+  allTimeCount: 0,
+  nextResetMs: 0,
+  series: [] as { date: string; count: number }[],
 }
 
 /* ---- Account ---------------------------------------------------------- */
@@ -139,7 +160,12 @@ export function AccountSection({
 /* ---- Plan and usage --------------------------------------------------- */
 
 export function PlanSection({ overview }: { overview: Overview }) {
-  const { plan, usage } = overview
+  // Coerced, not destructured raw. A field the server has not sent yet, or a
+  // client newer than its server, must not be able to blank the window: a throw
+  // inside React's render leaves a desktop app with no reachable console and no
+  // fix short of a release. This screen crashed exactly that way.
+  const plan = { ...EMPTY_PLAN, ...(overview.plan ?? {}) }
+  const usage = { ...EMPTY_USAGE, ...(overview.usage ?? {}) }
   const pct =
     plan.monthlyLimit > 0 ? Math.min(100, (usage.monthCount / plan.monthlyLimit) * 100) : 0
 
@@ -169,10 +195,10 @@ export function PlanSection({ overview }: { overview: Overview }) {
           <span className="font-mono text-[13px]">
             {formatCount(usage.todayCount)}
             {/* Null is "no daily limit set", which is emphatically not zero. */}
-            {plan.dailyLimit === null ? "" : ` / ${formatCount(plan.dailyLimit)}`}
+            {plan.dailyLimit == null ? "" : ` / ${formatCount(plan.dailyLimit)}`}
           </span>
         }
-        hint={plan.dailyLimit === null ? "No daily limit on this plan." : undefined}
+        hint={plan.dailyLimit == null ? "No daily limit on this plan." : undefined}
       />
       <Row label="All time" value={formatCount(usage.allTimeCount)} />
       <Row label="Monthly reset" value={`in ${formatResetIn(usage.nextResetMs)}`} />

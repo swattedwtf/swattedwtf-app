@@ -28,19 +28,29 @@ export function BadgeRow({
   return (
     <ul className="flex flex-wrap gap-2">
       {badges.map((badge) => (
+        // A badge WITH art shows only the art: the name is on hover, because
+        // repeating it beside the icon says the same thing twice and turns a
+        // row of marks into a wall of text. A badge without art has to fall
+        // back to its name, or it would be an invisible entry.
         <li
           key={badge.label}
           title={badge.title ?? badge.label}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+          aria-label={badge.label}
+          className={
+            badge.iconUrl
+              ? "inline-flex items-center justify-center rounded-lg bg-white/[0.06] p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+              : "inline-flex items-center rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+          }
         >
           {badge.iconUrl ? (
             <RemoteImage
               url={badge.iconUrl}
               alt={badge.label}
-              className="h-3.5 w-3.5 rounded-[3px] text-[8px]"
+              className="h-5 w-5 rounded-[4px] text-[8px]"
             />
-          ) : null}
-          <span>{badge.label}</span>
+          ) : (
+            <span>{badge.label}</span>
+          )}
         </li>
       ))}
     </ul>

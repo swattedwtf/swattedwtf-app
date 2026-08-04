@@ -108,3 +108,23 @@ describe("LockedSection and EmptyState", () => {
     expect(html).not.toContain("—")
   })
 })
+
+describe("BadgeRow shows the art, not the art plus its name", () => {
+  it("renders only the icon when a badge has one", () => {
+    const html = renderToStaticMarkup(
+      <BadgeRow badges={[{ label: "Nitro", iconUrl: "/api/desktop/image?u=x" }]} />,
+    )
+    // The name stays reachable as a tooltip and to assistive tech, but is not
+    // printed beside the mark: a row of icons each captioned with its own name
+    // is a wall of text, not a row of badges.
+    expect(html).toContain('aria-label="Nitro"')
+    expect(html).toContain('title="Nitro"')
+    expect(html).not.toContain(">Nitro<")
+  })
+
+  it("falls back to the name when a badge has no art", () => {
+    // Otherwise the entry would be invisible.
+    const html = renderToStaticMarkup(<BadgeRow badges={[{ label: "Staff", iconUrl: null }]} />)
+    expect(html).toContain(">Staff<")
+  })
+})

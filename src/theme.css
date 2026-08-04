@@ -281,6 +281,11 @@ textarea {
 .btn-secondary[aria-busy="true"] {
   opacity: 0.6;
   cursor: default;
+  /* Room for the ring, so it sits BESIDE the label rather than on top of it.
+     Without this the spinner was drawn over the word "Search" on a button
+     sized to its text. Padding rather than a wider button, so the control does
+     not resize under the pointer at the moment it is pressed. */
+  padding-right: 34px;
 }
 
 .btn-primary[aria-busy="true"]::after,

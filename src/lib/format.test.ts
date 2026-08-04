@@ -51,3 +51,23 @@ describe("formatSince", () => {
     expect(formatSince("not a date")).toBe("")
   })
 })
+
+describe("formatters never take the window down", () => {
+  it("formats an absent count as nothing, not a crash and not a fake zero", () => {
+    // This crashed the entire Settings screen: a strict `=== null` guard let an
+    // undefined field reach `.toLocaleString()`, and a throw inside React's
+    // render blanks a desktop window that has no reachable console.
+    expect(formatCount(undefined)).toBe("")
+    expect(formatCount(null)).toBe("")
+    expect(formatCount(Number.NaN)).toBe("")
+    expect(formatCount(0)).toBe("0")
+    expect(formatCount(1234)).toBe("1,234")
+  })
+
+  it("survives an absent reset time and an absent date", () => {
+    expect(formatResetIn(undefined)).toBe("")
+    expect(formatResetIn(null)).toBe("")
+    expect(formatSince(undefined)).toBe("")
+    expect(formatSince("")).toBe("")
+  })
+})
