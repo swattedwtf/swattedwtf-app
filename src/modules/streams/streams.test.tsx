@@ -130,9 +130,16 @@ describe("SearchResult renders progressively and coerces safely", () => {
 
   it("renders each source and its fields as they arrive", () => {
     const html = renderResult(searchDescriptor, frames, "done")
+    // The source and its value, drawn as a record card.
     expect(html).toContain("LeakDB")
     expect(html).toContain("a@b.co")
-    expect(html).toContain("Sweep summary")
+    // And the summary tiles that open the result. The record count is derived
+    // from the fixture, not a hardcoded copy string.
+    expect(html).toContain("Breach and leak records")
+    const recordCount = frames
+      .filter((f) => f.t === "progress")
+      .reduce((n, f) => n + (Array.isArray(f.records) ? f.records.length : 0), 0)
+    expect(html).toContain(`>${recordCount}<`)
   })
 
   it("shows an explicit no-results state when a completed sweep found nothing", () => {

@@ -94,6 +94,12 @@ export const MODULES: ModuleDescriptor[] = [
  * metered to charge, so it talks to its own unmetered endpoint rather than the
  * lookup one. Minting a connector is still Heist-gated and rate-limited
  * server-side, exactly as the web's pair route is.
+ *
+ * `/plans` is here for the plainest reason of all: it sells the plans rather
+ * than spending one. It has no query, nothing metered, and its prices arrive in
+ * the same boot-time Overview /api reads. The purchase itself is handed to the
+ * web checkout, which is where card entry, promo redemption and fulfillment
+ * live behind browser-only controls.
  */
 export const BUILT_IN_ROUTES = [
   "/dashboard",
@@ -103,6 +109,7 @@ export const BUILT_IN_ROUTES = [
   "/investigations",
   "/face",
   "/roblox/server-intel",
+  "/plans",
 ]
 
 /**

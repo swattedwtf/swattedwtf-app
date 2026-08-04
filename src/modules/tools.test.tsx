@@ -11,7 +11,10 @@ import {
   addressInsightsDescriptor,
   cobraDescriptor,
   falconDescriptor,
+  fmtPhone,
   intelxDescriptor,
+  plural,
+  prettyLabel,
   samsungDescriptor,
   skiptracerDescriptor,
 } from "./tools"
@@ -99,6 +102,14 @@ const address = {
   totalValue: "398000000",
   lastSaleDate: "1800-11-01",
   latLong: { latitude: 38.8977, longitude: -77.0365, accuracy: "RoofTop" },
+  // What the server emits once it has coordinates and a map token: a Mapbox
+  // static render, already rewritten onto our own image proxy. The token is not
+  // in it, and must never be.
+  mapImageUrl:
+    "/api/desktop/image?u=" +
+    encodeURIComponent(
+      "https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-l+ffffff(-77.0365,38.8977)/-77.0365,38.8977,16,0/640x360@2x",
+    ),
   currentResidents: [
     {
       name: "Jane Resident",
@@ -134,7 +145,15 @@ const falcon = {
   answered: true,
   query: "name@example.com",
   queryType: "email",
-  groups: [{ title: "Phones", entries: [{ value: "+14155550123", quantity: 3 }] }],
+  groups: [
+    {
+      title: "Phones",
+      // The group's real size, which the server carries because it is the one
+      // number a cut list cannot be asked for.
+      entryTotal: 1,
+      entries: [{ value: "+14155550123", quantity: 3 }],
+    },
+  ],
   truncated: false,
   profiles: [
     {
@@ -301,6 +320,20 @@ describe("Samsung result", () => {
     const html = render(SamsungResult, { ...samsung, found: false, records: [], recordCount: 0 })
     expect(html).toContain("No matching Samsung account record was found.")
   })
+
+  it("turns the provider's own keys into readable labels", () => {
+    // Samsung's records are whatever fields the upstream sent, so the label IS
+    // the raw key. A column of "birth_date" reads as a database dump.
+    const key = "birth_date"
+    const html = render(SamsungResult, {
+      ...samsung,
+      records: [{ fields: [{ label: key, value: "1990-01-01" }] }],
+      recordCount: 1,
+    })
+    expect(html).toContain(prettyLabel(key))
+    expect(prettyLabel(key)).not.toBe(key)
+    expect(html).not.toContain(`>${key}<`)
+  })
 })
 
 describe("Skiptracer result", () => {
@@ -350,17 +383,101 @@ describe("Skiptracer result", () => {
     expect(dead).toContain("could not be reached")
     expect(dead).not.toContain("searched and returned no records")
   })
+
+  it("counts its records, its people and its owned properties from the rows themselves", () => {
+    const html = render(SkiptracerResult, skiptracer)
+    const people = skiptracer.records.reduce((n, r) => n + r.persons.length, 0)
+    const owned = skiptracer.records.filter((r) => r.owner.name).length
+    for (const [label, value] of [
+      ["Records", skiptracer.records.length],
+      ["People", people],
+      ["With an owner", owned],
+    ] as const) {
+      expect(html).toContain(label)
+      expect(html).toContain(`>${value.toLocaleString()}</div>`)
+    }
+  })
+
+  it("labels a record with the property type the provider classified it as", () => {
+    const html = render(SkiptracerResult, skiptracer)
+    expect(html).toContain(skiptracer.records[0].propertyType)
+  })
 })
 
 describe("Address Insights result", () => {
+  const resident = address.currentResidents[0]
+
   it("shows the address, its flags and its residents", () => {
     const html = render(AddressInsightsResult, address)
-    expect(html).toContain("1600 Pennsylvania Ave")
-    expect(html).toContain("Jane Resident")
-    expect(html).toContain("+12025550123")
-    expect(html).toContain("Sam Associate")
-    expect(html).toContain("5 Old Road")
-    expect(html).toContain("38.8977, -77.0365")
+    expect(html).toContain(address.streetLine1)
+    expect(html).toContain(resident.name)
+    expect(html).toContain(resident.associatedPeople[0].name)
+    expect(html).toContain(resident.historicalAddresses[0].streetLine1)
+    expect(html).toContain(`${address.latLong.latitude}, ${address.latLong.longitude}`)
+  })
+
+  it("prints a phone number the way a person would dial it", () => {
+    // The raw provider string is an E.164 blob. The web's panel formats it, and
+    // an OSINT result is something someone actually dials.
+    const raw = resident.phones[0].phoneNumber
+    const html = render(AddressInsightsResult, address)
+    expect(html).toContain(fmtPhone(raw))
+    expect(fmtPhone(raw)).not.toBe(raw)
+    expect(html).toContain(resident.phones[0].lineType)
+  })
+
+  it("counts residents, owners, phones and past addresses from the payload itself", () => {
+    const html = render(AddressInsightsResult, address)
+    const people = [...address.currentResidents, ...address.owners]
+    const phones = people.reduce((n, p) => n + p.phones.length, 0)
+    const past = people.reduce(
+      (n, p) => n + p.historicalAddresses.filter((h) => h.streetLine1).length,
+      0,
+    )
+    for (const [label, value] of [
+      ["Residents", address.currentResidents.length],
+      ["Owners", address.owners.length],
+      ["Phones", phones],
+      ["Past addresses", past],
+    ] as const) {
+      expect(html).toContain(label)
+      expect(html).toContain(`>${value.toLocaleString()}</div>`)
+    }
+  })
+
+  it("draws the map the server rendered, labelled with the address", () => {
+    const html = render(AddressInsightsResult, address)
+    // The image itself resolves through the IPC bridge at runtime, so what is in
+    // the markup is its label. That label has to name the place, or a map that
+    // fails to load says nothing at all.
+    expect(html).toContain(`Map of ${address.streetLine1}`)
+    expect(html).not.toContain("No map is available")
+    // Six decimals, as the web's panel prints them.
+    expect(html).toContain(address.latLong.latitude.toFixed(6))
+    expect(html).toContain(address.latLong.longitude.toFixed(6))
+  })
+
+  it("never puts a Mapbox token in the markup", () => {
+    // The server attaches the credential at fetch time. A payload that carried
+    // one would put it in the DOM of a screen anyone can screenshot.
+    const html = render(AddressInsightsResult, address)
+    expect(html).not.toContain("access_token")
+  })
+
+  it("says a map is unavailable rather than drawing a broken one", () => {
+    // Coordinates but no render: no map token on the server. Not a fact about
+    // the address, and not a reason to hide the coordinates.
+    const html = render(AddressInsightsResult, { ...address, mapImageUrl: null })
+    expect(html).toContain("No map is available")
+    expect(html).toContain(address.latLong.latitude.toFixed(6))
+  })
+
+  it("shows no map section at all when the provider placed no coordinates", () => {
+    const html = render(AddressInsightsResult, { ...address, latLong: null, mapImageUrl: null })
+    expect(html).not.toContain("No map is available")
+    expect(html).not.toContain("Open in a map")
+    // The rest of the record is unaffected.
+    expect(html).toContain(resident.name)
   })
 
   it("separates an unresolvable address from an unreachable provider", () => {
@@ -408,6 +525,42 @@ describe("Falcon result", () => {
     const html = render(FalconResult, { ...falcon, groups: [], profiles: [], discoveryCount: 0 })
     expect(html).toContain("swept and found nothing")
   })
+
+  it("heads a group with the size the server reported, not the size it shipped", () => {
+    // The server cuts a runaway group at its own ceiling and carries the real
+    // count separately. Counting the delivered rows instead would report the
+    // ceiling as the total for every oversized group.
+    const entries = falcon.groups[0].entries
+    const entryTotal = entries.length + 3_800
+    const html = render(FalconResult, {
+      ...falcon,
+      groups: [{ ...falcon.groups[0], entryTotal, entries }],
+    })
+    expect(html).toContain(entryTotal.toLocaleString())
+    expect(html).toContain(`${entries.length.toLocaleString()} were carried`)
+  })
+
+  it("does not claim a complete group was cut", () => {
+    const group = falcon.groups[0]
+    const html = render(FalconResult, {
+      ...falcon,
+      groups: [{ ...group, entryTotal: group.entries.length }],
+    })
+    expect(html).not.toContain("were carried")
+  })
+
+  it("shows a multiplier only for a value seen more than once", () => {
+    const group = falcon.groups[0]
+    const once = render(FalconResult, {
+      ...falcon,
+      groups: [{ ...group, entries: [{ value: "solo@example.com", quantity: 1 }] }],
+    })
+    expect(once).toContain("solo@example.com")
+    expect(once).not.toContain(">x1</span>")
+
+    const many = render(FalconResult, falcon)
+    expect(many).toContain(`>x${group.entries[0].quantity}</span>`)
+  })
 })
 
 describe("IntelX result", () => {
@@ -435,6 +588,46 @@ describe("IntelX result", () => {
     expect(render(IntelxResult, { answered: false, found: false })).toContain(
       "could not be reached",
     )
+  })
+
+  it("offers the whole file to the clipboard, since the webview cannot download", () => {
+    expect(render(IntelxResult, intelx)).toContain("Copy file")
+    // Nothing to copy is no button, rather than a button that copies "".
+    expect(render(IntelxResult, { ...intelx, content: "" })).not.toContain("Copy file")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The formatting helpers, on their own
+// ---------------------------------------------------------------------------
+
+describe("Tools formatting", () => {
+  it("humanises a provider key without inventing words", () => {
+    expect(prettyLabel("birth_date")).toBe("Birth Date")
+    expect(prettyLabel("first-name")).toBe("First Name")
+    expect(prettyLabel("lineType")).toBe("Line Type")
+    expect(prettyLabel("email")).toBe("Email")
+    // A key with nothing to humanise is still a key, never an empty label.
+    expect(prettyLabel("_")).toBe("_")
+  })
+
+  it("formats a North American number and leaves every other one alone", () => {
+    expect(fmtPhone("+12025550123")).toBe("(202) 555-0123")
+    expect(fmtPhone("2025550123")).toBe("(202) 555-0123")
+    // Reshaping an international number by a North American rule produces a
+    // wrong number, and these get dialled.
+    for (const raw of ["+442071234567", "+81312345678", "555", ""]) {
+      expect(fmtPhone(raw)).toBe(raw)
+    }
+  })
+
+  it("pluralises the nouns this file actually uses", () => {
+    expect(plural(1, "record")).toBe("1 record")
+    expect(plural(2, "record")).toBe("2 records")
+    expect(plural(1, "address")).toBe("1 address")
+    expect(plural(2, "address")).toBe("2 addresses")
+    expect(plural(1, "person")).toBe("1 person")
+    expect(plural(3, "person")).toBe("3 people")
   })
 })
 
@@ -493,6 +686,58 @@ describe("Cobra result", () => {
     const html = render(CobraResult, { ...cobra, domain: null, badActivity: null })
     expect(html).not.toContain("MarkMonitor")
     expect(html).not.toContain("Blacklisted")
+  })
+
+  it("draws a risk meter whose width is the reported proportion", () => {
+    const html = render(CobraResult, cobra)
+    const pct = Math.round((cobra.risk.score / cobra.risk.max) * 100)
+    expect(html).toContain(`width:${pct}%`)
+    expect(html).toContain(`aria-valuenow="${cobra.risk.score}"`)
+    expect(html).toContain(`aria-valuemax="${cobra.risk.max}"`)
+  })
+
+  it("draws no meter when nobody sent a denominator", () => {
+    // A bar needs a proportion. Inventing the denominator is how a NaN width
+    // and a "12 / 0" got on screen on the web.
+    const html = render(CobraResult, { ...cobra, risk: { score: 12, max: null, label: "low" } })
+    expect(html).not.toContain("aria-valuenow")
+    expect(html).not.toContain("width:")
+    expect(html).toContain("12")
+  })
+
+  it("lists every exposed data class of a breach as its own tag", () => {
+    const html = render(CobraResult, cobra)
+    for (const exposed of cobra.breaches[0].exposedData) {
+      expect(html).toContain(`>${exposed}</span>`)
+    }
+  })
+
+  it("keeps a linked account's extra fields behind a disclosure", () => {
+    const account = cobra.linkedAccounts[0]
+    const html = render(CobraResult, cobra)
+    // The row itself is always readable.
+    expect(html).toContain(account.platform)
+    expect(html).toContain(account.displayName)
+    // The account id only exists on a minority of rows, so it opens on demand
+    // rather than padding every row with blanks.
+    expect(html).toContain(">More</span>")
+    expect(html).not.toContain(`>${account.accountId}</dd>`)
+  })
+
+  it("offers no disclosure on a row that has nothing behind it", () => {
+    const html = render(CobraResult, {
+      ...cobra,
+      linkedAccounts: [
+        {
+          ...cobra.linkedAccounts[0],
+          accountId: null,
+          fullName: null,
+          parsedEmail: null,
+          profileImgUrl: null,
+        },
+      ],
+    })
+    expect(html).not.toContain(">More<")
   })
 })
 

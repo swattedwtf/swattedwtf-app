@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react"
+import { ThemeSection } from "./ThemeSection"
 
 import type { IntegrityReport } from "../boot/machine"
 import { ipc, type Overview, type SettingsView, type WindowDiagnostics } from "../lib/ipc"
@@ -184,8 +185,8 @@ export function PlanSection({ overview }: { overview: Overview }) {
             {formatCount(usage.monthCount)} / {formatCount(plan.monthlyLimit)}
           </span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-white/70" style={{ width: `${pct}%` }} />
+        <div className="meter mt-2 h-1.5 overflow-hidden rounded-full">
+          <div className="meter-fill h-full rounded-full" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
@@ -326,7 +327,7 @@ export function ShortcutSection({
 
         {captured && (
           <>
-            <span className="rounded-lg bg-white/5 px-3 py-1.5 font-mono text-[13px]">
+            <span className="glass-tile rounded-lg px-3 py-1.5 font-mono text-[13px]">
               {formatCombo(captured)}
             </span>
             <button
@@ -571,7 +572,7 @@ export function AdvancedSection({
           {updateMessage && <Help>{updateMessage}</Help>}
 
           {diag && (
-            <pre className="no-drag max-h-40 select-text overflow-auto rounded-lg bg-black/40 p-3 font-mono text-[10px] leading-relaxed text-white/70">
+            <pre className="glass-input no-drag max-h-40 select-text overflow-auto p-3 font-mono text-[10px] leading-relaxed text-white/70">
               {JSON.stringify(diag, null, 2)}
             </pre>
           )}
@@ -584,6 +585,54 @@ export function AdvancedSection({
 
 /* ---- The screen ------------------------------------------------------- */
 
+/**
+ * The three groups the page is split into.
+ *
+ * Settings was one long column of six panels, which meant scrolling past the
+ * plan and the security panel to reach a keyboard shortcut. Account is who you
+ * are and what you pay for, App is how the program behaves on this machine,
+ * Theme is how it looks.
+ */
+export type SettingsTab = "account" | "app" | "theme"
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "account", label: "Account" },
+  { id: "app", label: "App" },
+  { id: "theme", label: "Theme" },
+]
+
+export function SettingsTabs({
+  tab,
+  onChange,
+}: {
+  tab: SettingsTab
+  onChange: (t: SettingsTab) => void
+}) {
+  return (
+    <div role="tablist" aria-label="Settings sections" className="-mb-px flex gap-6 border-b border-white/[0.08]">
+      {TABS.map((t) => {
+        const active = t.id === tab
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(t.id)}
+            className={`relative -mb-px border-b-2 px-0.5 pb-2.5 pt-3 text-[13px] font-medium transition-colors ${
+              active
+                ? "border-white text-white"
+                : "border-transparent text-white/50 hover:border-white/20 hover:text-white/80"
+            }`}
+          >
+            {t.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function Settings({
   overview,
   integrity,
@@ -594,6 +643,7 @@ export function Settings({
   onLoggedOut: () => void
 }) {
   const [version, setVersion] = useState("")
+  const [tab, setTab] = useState<SettingsTab>("account")
   const [view, setView] = useState<SettingsView | null>(null)
   const [updateMessage, setUpdateMessage] = useState("")
   const [busy, setBusy] = useState(false)
@@ -714,22 +764,45 @@ export function Settings({
   }, [onLoggedOut])
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5 pb-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+    <div className="mx-auto w-full max-w-3xl pb-8">
+      <header className="border-b border-white/[0.08] pb-5">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
+          / Settings
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Settings</h1>
+        <p className="mt-1.5 text-sm text-[var(--color-muted-foreground)]">
+          Manage your account, how the app behaves, and how it looks.
+        </p>
+      </header>
 
-      <AccountSection overview={overview} busy={busy} onLogout={logout} />
-      <PlanSection overview={overview} />
-      <ShortcutSection view={view} busy={busy} onApply={applyShortcut} />
-      <StartupSection view={view} busy={busy} onToggle={toggleStartup} />
-      <SecuritySection overview={overview} />
-      <AdvancedSection
-        version={version}
-        integrity={integrity}
-        appDataDir={view?.appDataDir ?? ""}
-        updateMessage={updateMessage}
-        busy={busy}
-        onCheckUpdates={checkUpdates}
-      />
+      <SettingsTabs tab={tab} onChange={setTab} />
+
+      <div className="mt-6 space-y-5">
+        {tab === "account" && (
+          <>
+            <AccountSection overview={overview} busy={busy} onLogout={logout} />
+            <PlanSection overview={overview} />
+            <SecuritySection overview={overview} />
+          </>
+        )}
+
+        {tab === "app" && (
+          <>
+            <ShortcutSection view={view} busy={busy} onApply={applyShortcut} />
+            <StartupSection view={view} busy={busy} onToggle={toggleStartup} />
+            <AdvancedSection
+              version={version}
+              integrity={integrity}
+              appDataDir={view?.appDataDir ?? ""}
+              updateMessage={updateMessage}
+              busy={busy}
+              onCheckUpdates={checkUpdates}
+            />
+          </>
+        )}
+
+        {tab === "theme" && <ThemeSection />}
+      </div>
     </div>
   )
 }

@@ -18,7 +18,13 @@ const PLANS_URL = "https://swattedw.tf/dashboard/plans"
  * tick. That is intentional for v1: the number is a coarse "6d", and a
  * per-second timer would be the only thing keeping the app awake at idle.
  */
-export function Home({ overview }: { overview: Overview }) {
+export function Home({
+  overview,
+  onNavigate,
+}: {
+  overview: Overview
+  onNavigate?: (href: string) => void
+}) {
   const { usage, plan, user } = overview
   const [plansFailed, setPlansFailed] = useState(false)
   const icon = "h-4 w-4 text-white"
@@ -71,7 +77,7 @@ export function Home({ overview }: { overview: Overview }) {
       </div>
 
       <ApiCards overview={overview} />
-      <QuickActions />
+      <QuickActions onNavigate={onNavigate} />
       <UsageChart series={usage.series} />
 
       <div className="glass">

@@ -29,6 +29,8 @@ function overviewWith(api: Partial<Overview["api"]>): Overview {
       key: null,
       ...api,
     },
+    // The tier catalog is the Plans screen's concern; empty here.
+    plans: { currentId: "free", discountPercent: 0, tiers: [] },
   }
 }
 

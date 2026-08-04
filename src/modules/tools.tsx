@@ -1,8 +1,20 @@
+import { useState } from "react"
+
+import { copyText } from "../lib/clipboard"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
-import { BadgeRow, EmptyState, FieldGrid, ProfileCard, Section, type Field } from "./ui"
+import {
+  BadgeRow,
+  EmptyState,
+  FieldGrid,
+  ProfileCard,
+  Section,
+  StatTiles,
+  type Field,
+  type StatTile,
+} from "./ui"
 
 /**
  * The whole Tools group: Samsung Lookup, Skiptracer, Address Insights, Falcon,
@@ -106,6 +118,138 @@ function yesNo(value: boolean | null | undefined): string {
 
 function bool3(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null
+}
+
+/**
+ * A provider's own key as a human label: "first_name" becomes "First Name".
+ *
+ * The same transform the web's Samsung record table applies. Samsung's records
+ * are whatever fields the upstream happened to send, so the label IS the raw key
+ * unless something turns it into words, and a column of "birth_date" reads as a
+ * database dump rather than a record about a person.
+ */
+export function prettyLabel(key: string): string {
+  const words = key.replace(/[_-]+/g, " ").replace(/([a-z\d])([A-Z])/g, "$1 $2").trim()
+  return words.replace(/\b\p{L}/gu, (c) => c.toUpperCase()) || key
+}
+
+/**
+ * A ten digit North American number as "(415) 555-0123", the way the web's
+ * Address Insights panel prints one.
+ *
+ * Anything that is not exactly that shape is returned UNCHANGED. An
+ * international number reformatted by a North American rule is a wrong number,
+ * and a phone number in an OSINT result is something a person will dial.
+ */
+export function fmtPhone(raw: string): string {
+  const match = raw.replace(/\D/g, "").match(/^1?(\d{3})(\d{3})(\d{4})$/)
+  return match ? `(${match[1]}) ${match[2]}-${match[3]}` : raw
+}
+
+/** The plurals a bare "+s" gets wrong in this file's copy. */
+const IRREGULAR_PLURALS: Record<string, string> = { person: "people" }
+
+/** A count with its noun, pluralised. "1 address", "2 addresses", "3 people". */
+export function plural(n: number, noun: string): string {
+  if (n === 1) return `1 ${noun}`
+  const many = IRREGULAR_PLURALS[noun] ?? (/(?:s|x|z|ch|sh)$/.test(noun) ? `${noun}es` : `${noun}s`)
+  return `${n.toLocaleString()} ${many}`
+}
+
+/**
+ * Values as pills, the way the web renders Falcon's group entries and Cobra's
+ * exposed-data tags.
+ *
+ * `tone` is the one visual distinction: an exposed data class ("passwords") is
+ * a finding about the user's own risk rather than an ordinary value. It is
+ * warning-toned rather than destructive-toned because the destructive colour in
+ * this palette is a dark red that is genuinely hard to read on near-black, and
+ * an unreadable warning is not a warning.
+ */
+function Chips({
+  items,
+  tone,
+}: {
+  items: { label: string; note?: string }[]
+  tone?: "warning"
+}) {
+  if (items.length === 0) return null
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {items.map((item, i) => (
+        <li
+          key={`${item.label}-${i}`}
+          title={item.label}
+          className={`glass-tile inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] ${
+            tone === "warning" ? "text-[var(--color-warning)]" : "text-white/85"
+          }`}
+        >
+          <span className="min-w-0 truncate">{item.label}</span>
+          {item.note ? (
+            <span className="shrink-0 text-[10px] text-[var(--color-muted-foreground)]">
+              {item.note}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * A list that opens at `step` rows and grows on request.
+ *
+ * Every one of these screens can be handed hundreds of rows, and the web pages
+ * page them rather than dropping them. The desktop screens used to `slice()` a
+ * hard cap and say nothing, which silently hid real findings. Nothing is hidden
+ * without a control that says how much.
+ */
+function useLimit(step: number, total: number) {
+  const [limit, setLimit] = useState(step)
+  const shown = Math.min(limit, total)
+  return {
+    shown,
+    remaining: total - shown,
+    more: () => setLimit((n) => n + step),
+  }
+}
+
+/** The "show the rest" control for a `useLimit` list. */
+function MoreButton({
+  remaining,
+  noun,
+  onMore,
+}: {
+  remaining: number
+  noun: string
+  onMore: () => void
+}) {
+  if (remaining <= 0) return null
+  return (
+    <button type="button" onClick={onMore} className="btn-secondary btn-compact mt-3">
+      {`Show ${plural(remaining, noun)}`}
+    </button>
+  )
+}
+
+/** Copies a value to the clipboard and says so briefly. */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      type="button"
+      className="btn-secondary btn-compact"
+      onClick={() => {
+        void copyText(value).then((ok) => {
+          if (!ok) return
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1200)
+        })
+      }}
+    >
+      {copied ? "Copied" : label}
+    </button>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -221,13 +365,38 @@ export function SamsungResult({ data }: ResultProps) {
           />
         </Section>
       ) : (
-        d.records.slice(0, 25).map((record, i) => (
-          <Section key={i} title={`Record ${i + 1} of ${d.recordCount || d.records.length}`}>
-            <FieldGrid fields={list<{ label: string; value: string }>(record?.fields)} />
-          </Section>
-        ))
+        <SamsungRecords records={d.records} total={d.recordCount || d.records.length} />
       )}
     </div>
+  )
+}
+
+/** How many records open before the "show more" control appears. */
+const SAMSUNG_PAGE = 10
+
+/**
+ * The records, paged.
+ *
+ * The labels are the provider's own keys, humanised on the way out exactly as
+ * the web's record table humanises them: the server carries the key verbatim,
+ * because the key is data, and turning it into words is presentation.
+ */
+function SamsungRecords({ records, total }: { records: SamsungRecord[]; total: number }) {
+  const page = useLimit(SAMSUNG_PAGE, records.length)
+  return (
+    <>
+      {records.slice(0, page.shown).map((record, i) => (
+        <Section key={i} title={`Record ${i + 1} of ${total}`}>
+          <FieldGrid
+            fields={list<{ label: string; value: string }>(record?.fields).map((f) => ({
+              label: prettyLabel(text(f?.label)),
+              value: text(f?.value),
+            }))}
+          />
+        </Section>
+      ))}
+      <MoreButton remaining={page.remaining} noun="record" onMore={page.more} />
+    </>
   )
 }
 
@@ -403,24 +572,70 @@ export function SkiptracerResult({ data }: ResultProps) {
     )
   }
 
+  const records = d.records.map((rec) =>
+    withDefaults(rec, {
+      address: null,
+      city: null,
+      state: null,
+      zip: null,
+      county: null,
+      propertyType: null,
+      owner: EMPTY_OWNER,
+      persons: [],
+    } as SkiptracerRecord),
+  )
+  const people = records.reduce((n, r) => n + list<SkiptracerPerson>(r.persons).length, 0)
+  const owned = records.filter((r) => withDefaults(r.owner, EMPTY_OWNER).name).length
+
   return (
     <div className="space-y-4">
-      {d.records.slice(0, 25).map((rec, i) => {
-        const record = withDefaults(rec, {
-          address: null,
-          city: null,
-          state: null,
-          zip: null,
-          county: null,
-          propertyType: null,
-          owner: EMPTY_OWNER,
-          persons: [],
-        } as SkiptracerRecord)
+      {/* The web opens its record list with a plain count. These are the same
+          numbers, derived from the rows below rather than from any field the
+          provider sent, so they cannot disagree with what is on screen. */}
+      <StatTiles
+        tiles={[
+          { label: "Records", value: (d.count || records.length).toLocaleString() },
+          { label: "People", value: people.toLocaleString() },
+          { label: "With an owner", value: owned.toLocaleString() },
+        ]}
+      />
+      <SkiptracerRecords records={records} total={d.count || records.length} />
+    </div>
+  )
+}
+
+/** How many records open before the "show more" control appears. */
+const SKIPTRACER_PAGE = 10
+
+function SkiptracerRecords({
+  records,
+  total,
+}: {
+  records: SkiptracerRecord[]
+  total: number
+}) {
+  const page = useLimit(SKIPTRACER_PAGE, records.length)
+  return (
+    <>
+      {records.slice(0, page.shown).map((record, i) => {
         const owner = withDefaults(record.owner, EMPTY_OWNER)
         const persons = list<SkiptracerPerson>(record.persons)
 
         return (
-          <Section key={i} title={`Record ${i + 1} of ${d.count || d.records.length}`}>
+          <Section
+            key={i}
+            title={`Record ${i + 1} of ${total}`}
+            // The web puts the property type in a pill beside the address. It is
+            // the one field that classifies the whole record, so it reads better
+            // as a label on the section than as another row in the grid.
+            action={
+              record.propertyType ? (
+                <span className="glass-tile shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/80">
+                  {record.propertyType}
+                </span>
+              ) : undefined
+            }
+          >
             <FieldGrid
               fields={[
                 { label: "Address", value: placeLine(record) },
@@ -437,7 +652,7 @@ export function SkiptracerResult({ data }: ResultProps) {
             />
 
             {persons.length > 0 ? (
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-4 space-y-2">
                 {persons.map((p, j) => {
                   const person = withDefaults(p, {
                     name: "",
@@ -448,19 +663,23 @@ export function SkiptracerResult({ data }: ResultProps) {
                     deceased: null,
                   } as SkiptracerPerson)
                   return (
-                    <li key={j}>
-                      <p className="text-[13px] text-white/85">{person.name || "Unnamed person"}</p>
-                      <FieldGrid
-                        fields={[
-                          { label: "Age", value: person.age },
-                          { label: "Gender", value: person.gender },
-                          { label: "Role", value: person.ownershipRole },
-                          { label: "Occupation", value: person.occupation },
-                          // Three states, and the third is silence. A blank here
-                          // renders as "Not reported", never as "living".
-                          { label: "Mortality", value: mortality(bool3(person.deceased)) },
-                        ]}
-                      />
+                    <li key={j} className="glass-tile px-4 py-3">
+                      <p className="text-[14px] font-medium text-white">
+                        {person.name || "Unnamed person"}
+                      </p>
+                      <div className="mt-2">
+                        <FieldGrid
+                          fields={[
+                            { label: "Age", value: person.age },
+                            { label: "Gender", value: person.gender },
+                            { label: "Role", value: person.ownershipRole },
+                            { label: "Occupation", value: person.occupation },
+                            // Three states, and the third is silence. A blank
+                            // here renders as "Not reported", never as "living".
+                            { label: "Mortality", value: mortality(bool3(person.deceased)) },
+                          ]}
+                        />
+                      </div>
                     </li>
                   )
                 })}
@@ -473,7 +692,8 @@ export function SkiptracerResult({ data }: ResultProps) {
           </Section>
         )
       })}
-    </div>
+      <MoreButton remaining={page.remaining} noun="record" onMore={page.more} />
+    </>
   )
 }
 
@@ -601,6 +821,17 @@ type AddressData = {
   totalValue: string | null
   lastSaleDate: string | null
   latLong: LatLong | null
+  /**
+   * A static Mapbox render of `latLong`, already rewritten onto our own image
+   * proxy by the server, or null when there are no coordinates or no map token.
+   *
+   * This is the desktop's answer to the web's interactive Mapbox GL canvas. The
+   * webview's CSP is `img-src 'self' data:` with remote script blocked, so there
+   * is no SDK to load and no canvas to pan; a picture of the same place, fetched
+   * through the same proxy as every other image in the app, is what is actually
+   * reachable here.
+   */
+  mapImageUrl: string | null
   currentResidents: AddressPerson[]
   owners: AddressPerson[]
 }
@@ -626,6 +857,63 @@ function coords(ll: LatLong | null): string {
   return ll.accuracy ? `${at} (${ll.accuracy})` : at
 }
 
+/** The six-decimal pair the web's address panel prints under the summary. */
+function preciseCoords(ll: LatLong | null): string {
+  if (!ll || !Number.isFinite(ll.latitude) || !Number.isFinite(ll.longitude)) return ""
+  return `${ll.latitude.toFixed(6)}, ${ll.longitude.toFixed(6)}`
+}
+
+/**
+ * The map, as a still.
+ *
+ * The web's version of this screen is a full-bleed interactive canvas that can
+ * be panned, zoomed and clicked to analyse another address. None of that
+ * survives the desktop CSP, so the two things worth keeping are kept: the
+ * picture, and a way to get to a real map. The button hands the coordinates to
+ * the user's own browser rather than pretending the still is interactive.
+ */
+function AddressMapSection({ url, place, ll }: { url: string | null; place: string; ll: LatLong }) {
+  const at = preciseCoords(ll)
+  return (
+    <Section
+      title="Map"
+      action={
+        <button
+          type="button"
+          className="btn-secondary btn-compact"
+          onClick={() => {
+            void ipc
+              .openExternal(
+                `https://www.google.com/maps/search/?api=1&query=${ll.latitude},${ll.longitude}`,
+              )
+              .catch(() => {})
+          }}
+        >
+          Open in a map
+        </button>
+      }
+    >
+      {url ? (
+        <RemoteImage
+          url={url}
+          alt={place ? `Map of ${place}` : "Map of the searched address"}
+          name="Map"
+          className="aspect-video w-full rounded-xl text-sm"
+        />
+      ) : (
+        // No coordinates from the provider, or no map key on the server. Neither
+        // is a fact about the address, so it is stated as what it is.
+        <EmptyState message="No map is available for this address." />
+      )}
+      {at ? (
+        <p className="mt-3 font-mono text-[11px] text-white/70">
+          {ll.accuracy ? `${at}  ${ll.accuracy}` : at}
+        </p>
+      ) : null}
+    </Section>
+  )
+}
+
 type HistoricalAddress = AddressPerson["historicalAddresses"][number]
 
 const EMPTY_HISTORICAL: HistoricalAddress = {
@@ -640,58 +928,174 @@ const EMPTY_HISTORICAL: HistoricalAddress = {
   until: null,
 }
 
-function historicalLine(h: HistoricalAddress): string {
-  const place = [h.streetLine1, h.streetLine2, h.city, h.stateCode, h.postalCode]
-    .filter(Boolean)
-    .join(", ")
-  const span = [h.since, h.until].filter(Boolean).join(" to ")
-  return [place || "Address withheld", span].filter(Boolean).join("  ")
+/** Everything a person's block needs to count, read once. */
+function personParts(person: AddressPerson) {
+  const p = withDefaults(person, EMPTY_PERSON)
+  return {
+    p,
+    name: p.name || [p.firstName, p.middleName, p.lastName].filter(Boolean).join(" "),
+    alternateNames: list<string>(p.alternateNames),
+    phones: list<{ phoneNumber: string; lineType: string | null }>(p.phones),
+    associated: list<{ name: string; relation: string | null; since: string | null }>(
+      p.associatedPeople,
+    ),
+    historical: list<HistoricalAddress>(p.historicalAddresses).filter(
+      (h) => withDefaults(h, EMPTY_HISTORICAL).streetLine1,
+    ),
+  }
 }
 
-function PersonBlock({ person }: { person: AddressPerson }) {
-  const p = withDefaults(person, EMPTY_PERSON)
-  const alternateNames = list<string>(p.alternateNames)
-  const phones = list<{ phoneNumber: string; lineType: string | null }>(p.phones)
-  const associated = list<{ name: string; relation: string | null; since: string | null }>(
-    p.associatedPeople,
+/** How many address-history rows open before the "show more" control appears. */
+const HISTORY_PAGE = 6
+
+/** One past address, drawn as the web's address-history card draws it: the
+ *  street on its own line, the city line beneath, and the span it was linked
+ *  for last. */
+function HistoryRows({ historical }: { historical: HistoricalAddress[] }) {
+  const page = useLimit(HISTORY_PAGE, historical.length)
+  return (
+    <div className="mt-3">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+        {`Address history (${historical.length})`}
+      </p>
+      <ul className="mt-2 space-y-2">
+        {historical.slice(0, page.shown).map((row, i) => {
+          const h = withDefaults(row, EMPTY_HISTORICAL)
+          const line2 = [h.city, [h.stateCode, h.postalCode].filter(Boolean).join(" ")]
+            .filter(Boolean)
+            .join(", ")
+          // "to", never an arrow: the web uses one and it is not a character
+          // this app's copy uses anywhere else.
+          const span = [h.since, h.until].filter(Boolean).join(" to ")
+          return (
+            <li key={i} className="glass-tile px-3 py-2.5">
+              <p className="text-[13px] text-white">
+                {[h.streetLine1, h.streetLine2].filter(Boolean).join(" ") || "Address withheld"}
+              </p>
+              {line2 ? <p className="text-[12px] text-white/70">{line2}</p> : null}
+              <p className="mt-1 font-mono text-[10px] text-[var(--color-muted-foreground)]">
+                {[span, h.locationType].filter(Boolean).join("  ")}
+              </p>
+            </li>
+          )
+        })}
+      </ul>
+      <MoreButton remaining={page.remaining} noun="address" onMore={page.more} />
+    </div>
   )
-  const historical = list<HistoricalAddress>(p.historicalAddresses)
+}
+
+/**
+ * One resident or owner.
+ *
+ * The web's right-hand panel opens a person into their own view: a header, a row
+ * of counts, the phone numbers formatted for dialling, and the address history
+ * as cards. There is no second view to push here, so the same material is drawn
+ * inline, on its own tile so a household of six does not read as one wall of
+ * text.
+ */
+function PersonBlock({ person }: { person: AddressPerson }) {
+  const { p, name, alternateNames, phones, associated, historical } = personParts(person)
 
   const fields: Field[] = [
-    { label: "Name", value: p.name || [p.firstName, p.middleName, p.lastName].filter(Boolean).join(" ") },
     { label: "Type", value: p.type },
     { label: "Age range", value: p.ageRange },
     { label: "Industry", value: p.industry },
     { label: "Linked since", value: p.linkedSince },
     { label: "Also known as", value: alternateNames.join(", ") },
-    {
-      label: "Phones",
-      value: phones
-        .map((ph) => (ph.lineType ? `${ph.phoneNumber} (${ph.lineType})` : ph.phoneNumber))
-        .join(", "),
-      mono: true,
-    },
-    {
-      label: "Associated people",
-      value: associated
-        .map((a) => (a.relation ? `${a.name} (${a.relation})` : a.name))
-        .join(", "),
-    },
   ]
 
   return (
-    <li>
-      <FieldGrid fields={fields} />
-      {historical.length > 0 ? (
-        <ul className="mt-2 space-y-1 text-[12px] text-white/70">
-          {historical.slice(0, 10).map((h, i) => (
-            <li key={i} className="truncate">
-              {historicalLine(withDefaults(h, EMPTY_HISTORICAL))}
-            </li>
-          ))}
-        </ul>
+    <li className="glass-tile p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="min-w-0 truncate text-[15px] font-semibold text-white">
+          {name || "Unnamed person"}
+        </p>
+        <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+          {[
+            phones.length ? plural(phones.length, "phone") : null,
+            historical.length ? plural(historical.length, "address") : null,
+            associated.length ? plural(associated.length, "link") : null,
+          ]
+            .filter(Boolean)
+            .join("  ") || "No linked records"}
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <FieldGrid fields={fields} hideEmpty />
+      </div>
+
+      {phones.length > 0 ? (
+        <div className="mt-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+            {`Phone numbers (${phones.length})`}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {phones.map((ph, i) => (
+              <li key={i} className="flex items-center justify-between gap-3">
+                {/* Formatted for a person to read and dial, exactly as the web
+                    formats it. A number that is not a ten digit North American
+                    one is printed as it arrived rather than reshaped. */}
+                <span className="min-w-0 truncate font-mono text-[13px] text-white">
+                  {fmtPhone(text(ph?.phoneNumber))}
+                </span>
+                <span className="shrink-0 text-[11px] text-white/70">{text(ph?.lineType)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
+
+      {associated.length > 0 ? (
+        <div className="mt-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+            {`Associated people (${associated.length})`}
+          </p>
+          <div className="mt-2">
+            <Chips
+              items={associated.map((a) => ({
+                label: text(a?.name) || "Unnamed",
+                note: nullableText(a?.relation) ?? undefined,
+              }))}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {historical.length > 0 ? <HistoryRows historical={historical} /> : null}
     </li>
+  )
+}
+
+/** How many people open in a section before the "show more" control appears. */
+const PEOPLE_PAGE = 8
+
+function PeopleSection({
+  title,
+  people,
+  empty,
+}: {
+  title: string
+  people: AddressPerson[]
+  empty: string
+}) {
+  const page = useLimit(PEOPLE_PAGE, people.length)
+  return (
+    <Section title={people.length ? `${title} (${people.length})` : title}>
+      {people.length === 0 ? (
+        <EmptyState message={empty} />
+      ) : (
+        <>
+          <ul className="space-y-3">
+            {people.slice(0, page.shown).map((p, i) => (
+              <PersonBlock key={i} person={p} />
+            ))}
+          </ul>
+          <MoreButton remaining={page.remaining} noun="person" onMore={page.more} />
+        </>
+      )}
+    </Section>
   )
 }
 
@@ -713,6 +1117,7 @@ export function AddressInsightsResult({ data }: ResultProps) {
     isValid: bool3(raw.isValid),
     totalValue: nullableText(raw.totalValue),
     lastSaleDate: nullableText(raw.lastSaleDate),
+    mapImageUrl: nullableText(raw.mapImageUrl),
     // A coordinate pair is only carried when both halves are real numbers: a
     // defaulted 0, 0 is a spot in the Atlantic, not a missing value.
     latLong: (() => {
@@ -737,6 +1142,21 @@ export function AddressInsightsResult({ data }: ResultProps) {
   const street = [d.streetLine1, d.streetLine2].filter(Boolean).join(" ")
   const place = [d.city, d.stateCode, d.postalCode].filter(Boolean).join(", ")
 
+  // Everyone the provider attached to this address, counted once. The web's
+  // panel merges residents and owners into one list; they are kept apart here,
+  // because "lives here" and "owns it" are different claims, but the headline
+  // numbers are over both.
+  const everyone = [...d.currentResidents, ...d.owners].map(personParts)
+  const phones = everyone.reduce((n, x) => n + x.phones.length, 0)
+  const pastAddresses = everyone.reduce((n, x) => n + x.historical.length, 0)
+
+  const tiles: StatTile[] = [
+    { label: "Residents", value: d.currentResidents.length.toLocaleString() },
+    { label: "Owners", value: d.owners.length.toLocaleString() },
+    { label: "Phones", value: phones.toLocaleString() },
+    { label: "Past addresses", value: pastAddresses.toLocaleString() },
+  ]
+
   return (
     <div className="space-y-4">
       <ProfileCard
@@ -760,6 +1180,14 @@ export function AddressInsightsResult({ data }: ResultProps) {
         }
       />
 
+      <StatTiles tiles={tiles} />
+
+      {/* Only when the provider actually placed the address. A map section with
+          nothing in it says less than no map section at all. */}
+      {d.latLong ? (
+        <AddressMapSection url={d.mapImageUrl} place={[street, place].filter(Boolean).join(", ")} ll={d.latLong} />
+      ) : null}
+
       <Section title="Property">
         <FieldGrid
           fields={[
@@ -772,29 +1200,17 @@ export function AddressInsightsResult({ data }: ResultProps) {
         />
       </Section>
 
-      <Section title={`Current residents${d.currentResidents.length ? ` (${d.currentResidents.length})` : ""}`}>
-        {d.currentResidents.length === 0 ? (
-          <EmptyState message="No current residents are recorded for this address." />
-        ) : (
-          <ul className="space-y-4">
-            {d.currentResidents.slice(0, 20).map((p, i) => (
-              <PersonBlock key={i} person={p} />
-            ))}
-          </ul>
-        )}
-      </Section>
+      <PeopleSection
+        title="Current residents"
+        people={d.currentResidents}
+        empty="No current residents are recorded for this address."
+      />
 
-      <Section title={`Owners${d.owners.length ? ` (${d.owners.length})` : ""}`}>
-        {d.owners.length === 0 ? (
-          <EmptyState message="No owners are recorded for this address." />
-        ) : (
-          <ul className="space-y-4">
-            {d.owners.slice(0, 20).map((p, i) => (
-              <PersonBlock key={i} person={p} />
-            ))}
-          </ul>
-        )}
-      </Section>
+      <PeopleSection
+        title="Owners"
+        people={d.owners}
+        empty="No owners are recorded for this address."
+      />
     </div>
   )
 }
@@ -831,7 +1247,13 @@ export const addressInsightsDescriptor: ModuleDescriptor = {
 // Falcon
 // ---------------------------------------------------------------------------
 
-type FalconGroup = { title: string; entries: { value: string; quantity: number }[] }
+type FalconGroup = {
+  title: string
+  /** How many entries the group really has, before the server's own per-group
+   *  ceiling. Never derived from `entries.length`, which is the CUT list. */
+  entryTotal: number
+  entries: { value: string; quantity: number }[]
+}
 
 type FalconData = {
   answered: boolean
@@ -907,50 +1329,97 @@ export function FalconResult({ data }: ResultProps) {
         </Section>
       ) : null}
 
-      {d.groups.slice(0, 25).map((g, i) => {
-        const group = withDefaults(g, { title: "", entries: [] } as FalconGroup)
-        const entries = list<{ value: string; quantity: number }>(group.entries)
-        return (
-          <Section key={i} title={group.title || `Group ${i + 1}`}>
-            <ul className="space-y-1 text-[13px]">
-              {entries.slice(0, 200).map((e, j) => (
-                <li key={j} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate text-white/85">{text(e?.value)}</span>
-                  {count(e?.quantity) > 0 ? (
-                    <span className="shrink-0 font-mono text-[11px] text-[var(--color-muted-foreground)]">
-                      {count(e.quantity).toLocaleString()}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )
-      })}
-
+      {/* Profiles first, as the web orders them: a named account somewhere is a
+          stronger result than a bag of harvested strings. */}
       {d.profiles.length > 0 ? (
-        <Section title={`Profiles (${d.profiles.length})`}>
-          <ul className="space-y-2">
-            {d.profiles.slice(0, 50).map((p, i) => (
-              <li key={i} className="flex items-center gap-2.5">
-                <RemoteImage
-                  url={p?.imageUrl}
-                  alt={text(p?.name) || text(p?.network) || "Profile"}
-                  className="h-8 w-8 shrink-0 rounded-lg text-[11px]"
-                />
-                <span className="min-w-[84px] text-[13px] text-[var(--color-muted-foreground)]">
-                  {text(p?.network) || "Unknown network"}
-                </span>
+        <FalconProfiles profiles={d.profiles} />
+      ) : null}
+
+      {d.groups.map((g, i) => (
+        <FalconGroupSection
+          key={i}
+          group={withDefaults(g, { title: "", entryTotal: 0, entries: [] } as FalconGroup)}
+          index={i}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** How many entries of a group open before the "show more" control appears. */
+const FALCON_ENTRY_PAGE = 24
+/** How many linked profiles open before the "show more" control appears. */
+const FALCON_PROFILE_PAGE = 24
+
+/**
+ * One harvested group, as the pill wall the web draws.
+ *
+ * The heading carries the group's REAL size, which is the server's `entryTotal`
+ * and not the length of the list below it: a group the server cut at its own
+ * ceiling would otherwise report the ceiling as the total.
+ */
+function FalconGroupSection({ group, index }: { group: FalconGroup; index: number }) {
+  const entries = list<{ value: string; quantity: number }>(group.entries)
+  const total = Math.max(count(group.entryTotal), entries.length)
+  const page = useLimit(FALCON_ENTRY_PAGE, entries.length)
+
+  return (
+    <Section
+      title={group.title || `Group ${index + 1}`}
+      action={
+        <span className="shrink-0 font-mono text-[11px] text-white/70">
+          {total.toLocaleString()}
+        </span>
+      }
+    >
+      <Chips
+        items={entries.slice(0, page.shown).map((e) => ({
+          label: text(e?.value),
+          // The web shows a multiplier only when a value was seen more than
+          // once, because "x1" on every pill is noise.
+          note: count(e?.quantity) > 1 ? `x${count(e.quantity).toLocaleString()}` : undefined,
+        }))}
+      />
+      <MoreButton remaining={page.remaining} noun="entry" onMore={page.more} />
+      {total > entries.length ? (
+        <div className="mt-3">
+          <Caveat>
+            {`This group has ${total.toLocaleString()} entries and only the first ${entries.length.toLocaleString()} were carried.`}
+          </Caveat>
+        </div>
+      ) : null}
+    </Section>
+  )
+}
+
+function FalconProfiles({ profiles }: { profiles: FalconData["profiles"] }) {
+  const page = useLimit(FALCON_PROFILE_PAGE, profiles.length)
+  return (
+    <Section title={`Linked profiles (${profiles.length})`}>
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {profiles.slice(0, page.shown).map((p, i) => (
+          <li key={i} className="glass-tile flex items-center gap-2.5 px-3 py-2.5">
+            <RemoteImage
+              url={p?.imageUrl}
+              alt={text(p?.name) || text(p?.network) || "Profile"}
+              className="h-8 w-8 shrink-0 rounded-lg text-[11px]"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium text-white">
+                {text(p?.network) || "Unknown network"}
+              </span>
+              <span className="block truncate text-[12px] text-white/70">
                 <LinkOrText
                   label={text(p?.name) || text(p?.alias) || text(p?.url) || "Profile"}
                   url={nullableText(p?.url)}
                 />
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-    </div>
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <MoreButton remaining={page.remaining} noun="profile" onMore={page.more} />
+    </Section>
   )
 }
 
@@ -1062,7 +1531,16 @@ export function IntelxResult({ data }: ResultProps) {
         ) : null}
       </ProfileCard>
 
-      <Section title="Contents">
+      <Section
+        title="Contents"
+        // The web offers a Download button, built from a Blob URL. The webview
+        // holds no filesystem permission at all, so the equivalent that is
+        // actually reachable is the clipboard, and it carries the WHOLE payload
+        // rather than the clipped view below it.
+        action={
+          d.content.length > 0 ? <CopyButton value={d.content} label="Copy file" /> : undefined
+        }
+      >
         {shown.length === 0 ? (
           <EmptyState message="The file came back empty." />
         ) : (
@@ -1242,24 +1720,7 @@ export function CobraResult({ data }: ResultProps) {
 
       {d.risk ? (
         <Section title="Risk">
-          <FieldGrid
-            fields={[
-              {
-                label: "Score",
-                value:
-                  d.risk.max !== null
-                    ? `${d.risk.score} of ${d.risk.max}`
-                    : // No denominator was sent, so none is shown. Defaulting one
-                      // in would put a number on screen that nobody reported.
-                      String(d.risk.score),
-              },
-              {
-                label: "Share of maximum",
-                value: d.risk.max !== null ? `${Math.round((d.risk.score / d.risk.max) * 100)}%` : "",
-              },
-              { label: "Rating", value: d.risk.label },
-            ]}
-          />
+          <RiskMeter risk={d.risk} />
         </Section>
       ) : null}
 
@@ -1271,29 +1732,7 @@ export function CobraResult({ data }: ResultProps) {
         {d.linkedAccounts.length === 0 ? (
           <EmptyState message="Cobra reported no linked accounts for that identifier." />
         ) : (
-          <ul className="space-y-2">
-            {d.linkedAccounts.slice(0, 60).map((a, i) => (
-              <li key={i} className="flex items-center gap-2.5">
-                <RemoteImage
-                  url={a?.profileImgUrl}
-                  alt={text(a?.platform) || "Account"}
-                  className="h-8 w-8 shrink-0 rounded-lg text-[11px]"
-                />
-                <span className="min-w-[84px] text-[13px] text-white/85">
-                  {text(a?.platform) || "Unknown platform"}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--color-muted-foreground)]">
-                  {/* Never the bare status string: "unknown" under a platform
-                      name reads as a confirmed account, which the provider
-                      explicitly refused to say. */}
-                  {accountStatus(text(a?.status))}
-                </span>
-                <span className="min-w-0 truncate text-[12px] text-white/70">
-                  {text(a?.displayName) || text(a?.fullName) || text(a?.parsedEmail)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <CobraAccounts accounts={d.linkedAccounts} />
         )}
       </Section>
 
@@ -1342,41 +1781,202 @@ export function CobraResult({ data }: ResultProps) {
         {d.breaches.length === 0 ? (
           <EmptyState message="Cobra reported no breaches for that identifier." />
         ) : (
-          <ul className="space-y-3">
-            {d.breaches.slice(0, 50).map((b, i) => {
-              const exposed = list<string>(b?.exposedData)
-              return (
-                <li key={i}>
-                  <p className="text-[13px] text-white/85">
-                    {text(b?.name) || "Unnamed breach"}
-                    {text(b?.date) ? (
-                      <span className="ml-2 font-mono text-[11px] text-[var(--color-muted-foreground)]">
-                        {text(b.date)}
-                      </span>
-                    ) : null}
-                  </p>
-                  <FieldGrid
-                    hideEmpty
-                    fields={[
-                      { label: "Domain", value: nullableText(b?.domain), mono: true },
-                      {
-                        label: "Records",
-                        value:
-                          nullableCount(b?.recordCount) !== null
-                            ? count(b.recordCount).toLocaleString()
-                            : "",
-                      },
-                      { label: "Exposed", value: exposed.join(", ") },
-                      { label: "Notes", value: nullableText(b?.description) },
-                    ]}
-                  />
-                </li>
-              )
-            })}
-          </ul>
+          <CobraBreaches breaches={d.breaches} />
         )}
       </Section>
     </div>
+  )
+}
+
+/**
+ * The risk score as the slim meter the web draws, rather than a bare number.
+ *
+ * The bar exists only when a denominator was actually reported. A missing max
+ * means the score is shown on its own: a bar needs a proportion, and inventing
+ * the denominator is how "12 / 0" and a NaN width got on screen on the web.
+ */
+function RiskMeter({ risk }: { risk: NonNullable<CobraData["risk"]> }) {
+  const max = risk.max
+  const pct = max !== null && max > 0 ? Math.min(100, Math.round((risk.score / max) * 100)) : null
+  // Palette tokens, not raw hex: the theme owns these three colours and they are
+  // the same three the rest of the app reads a severity from.
+  const tone =
+    pct === null
+      ? "bg-white"
+      : pct >= 66
+        ? "bg-[var(--color-destructive)]"
+        : pct >= 33
+          ? "bg-[var(--color-warning)]"
+          : "bg-[var(--color-positive)]"
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[15px] font-semibold text-white">{risk.label || "Risk"}</span>
+        <span className="font-mono text-[12px] text-white/70">
+          {max !== null ? `${risk.score} of ${max}` : String(risk.score)}
+        </span>
+      </div>
+      {pct !== null ? (
+        <div
+          role="meter"
+          aria-valuenow={risk.score}
+          aria-valuemin={0}
+          aria-valuemax={max ?? undefined}
+          aria-label={risk.label || "Risk"}
+          className="glass-tile mt-3 h-1.5 w-full overflow-hidden rounded-full"
+        >
+          {/* Width is the datum, so it is the one inline style here. The fill is
+              a palette colour class, never an inline background. */}
+          <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+        </div>
+      ) : null}
+      <div className="mt-3">
+        <FieldGrid
+          hideEmpty
+          fields={[
+            { label: "Rating", value: risk.label },
+            { label: "Share of maximum", value: pct !== null ? `${pct}%` : "" },
+          ]}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** How many linked accounts open before the "show more" control appears. */
+const COBRA_ACCOUNT_PAGE = 24
+/** How many breaches open before the "show more" control appears. Matches the
+ *  web page's own page size. */
+const COBRA_BREACH_PAGE = 24
+
+/**
+ * One linked account, opening onto whatever the provider knew about it.
+ *
+ * The web collapses the account id, the full name, the parsed email and the
+ * avatar behind a disclosure, and that is worth keeping: those fields exist on a
+ * minority of rows, and putting them inline turns a list of forty platforms into
+ * a page of mostly blanks.
+ */
+function CobraAccountRow({ account }: { account: CobraAccount }) {
+  const [open, setOpen] = useState(false)
+  const details: Field[] = [
+    { label: "Account ID", value: nullableText(account?.accountId), mono: true },
+    { label: "Full name", value: nullableText(account?.fullName) },
+    { label: "Parsed email", value: nullableText(account?.parsedEmail), mono: true },
+  ]
+  const hasDetails = details.some((f) => f.value) || Boolean(account?.profileImgUrl)
+  const registered = text(account?.status).trim().toLowerCase() === "registered"
+
+  return (
+    <li className="glass-tile overflow-hidden">
+      <button
+        type="button"
+        disabled={!hasDetails}
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${
+          hasDetails ? "glass-tile-hover" : ""
+        }`}
+      >
+        <RemoteImage
+          url={account?.profileImgUrl}
+          alt={text(account?.platform) || "Account"}
+          className="h-8 w-8 shrink-0 rounded-lg text-[11px]"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate text-[13px] font-medium text-white">
+              {text(account?.platform) || "Unknown platform"}
+            </span>
+            <span className="min-w-0 truncate font-mono text-[11px] text-white/70">
+              {text(account?.displayName) ||
+                text(account?.fullName) ||
+                text(account?.parsedEmail)}
+            </span>
+          </span>
+          {/* Never the bare status string: "unknown" under a platform name reads
+              as a confirmed account, which the provider explicitly refused to
+              say. A confirmed one is the only row that gets a colour. */}
+          <span
+            className={`mt-0.5 block truncate text-[11px] ${
+              registered ? "text-[var(--color-positive)]" : "text-[var(--color-muted-foreground)]"
+            }`}
+          >
+            {accountStatus(text(account?.status))}
+          </span>
+        </span>
+        {hasDetails ? (
+          <span className="shrink-0 font-mono text-[10px] text-white/60">
+            {open ? "Hide" : "More"}
+          </span>
+        ) : null}
+      </button>
+      {open && hasDetails ? (
+        <div className="border-t border-white/[0.06] px-3 py-3">
+          <FieldGrid hideEmpty fields={details} />
+        </div>
+      ) : null}
+    </li>
+  )
+}
+
+function CobraAccounts({ accounts }: { accounts: CobraAccount[] }) {
+  const page = useLimit(COBRA_ACCOUNT_PAGE, accounts.length)
+  return (
+    <>
+      <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        {accounts.slice(0, page.shown).map((a, i) => (
+          <CobraAccountRow key={i} account={a} />
+        ))}
+      </ul>
+      <MoreButton remaining={page.remaining} noun="account" onMore={page.more} />
+    </>
+  )
+}
+
+function CobraBreaches({ breaches }: { breaches: CobraData["breaches"] }) {
+  const page = useLimit(COBRA_BREACH_PAGE, breaches.length)
+  return (
+    <>
+      <ul className="space-y-2">
+        {breaches.slice(0, page.shown).map((b, i) => {
+          const exposed = list<string>(b?.exposedData)
+          const meta = [nullableText(b?.domain), nullableText(b?.date)].filter(Boolean).join("  ")
+          return (
+            <li key={i} className="glass-tile px-4 py-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <p className="min-w-0 truncate text-[14px] font-medium text-white">
+                  {text(b?.name) || "Unnamed breach"}
+                </p>
+                {nullableCount(b?.recordCount) !== null ? (
+                  <p className="shrink-0 font-mono text-[11px] text-white/70">
+                    {plural(count(b.recordCount), "record")}
+                  </p>
+                ) : null}
+              </div>
+              {meta ? (
+                <p className="mt-0.5 font-mono text-[11px] text-[var(--color-muted-foreground)]">
+                  {meta}
+                </p>
+              ) : null}
+              {nullableText(b?.description) ? (
+                <p className="mt-2 text-[12px] leading-relaxed text-white/70">
+                  {text(b.description)}
+                </p>
+              ) : null}
+              {exposed.length > 0 ? (
+                <div className="mt-2">
+                  {/* What was actually leaked, as its own row of tags: this is
+                      the part of a breach a person is looking for. */}
+                  <Chips tone="warning" items={exposed.map((e) => ({ label: e }))} />
+                </div>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+      <MoreButton remaining={page.remaining} noun="breach" onMore={page.more} />
+    </>
   )
 }
 

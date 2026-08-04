@@ -114,3 +114,37 @@ describe("flattenNav", () => {
     expect(flattenNav().find((l) => l.label === "Support")?.href).toBe("https://t.me/swatted_bot")
   })
 })
+
+describe("platform group headers", () => {
+  /**
+   * The group header row is a disclosure control, not a destination, and it
+   * used to be dimmed and pilled "soon" unconditionally. That was written when
+   * every platform under it was unbuilt, and it never followed the children: by
+   * the time Roblox, Instagram, TikTok, Snapchat and Telegram all worked, their
+   * headers still read as coming-soon, which is how the user found it.
+   *
+   * Sidebar derives the header's state from `isEnabled` over the children now,
+   * so this pins the invariant rather than the current answer.
+   */
+  it("has at least one live child under every platform group that owns children", () => {
+    const groups = NAV.flatMap((g) => g.items).filter((i) => i.children?.length)
+    expect(groups.length).toBeGreaterThan(0)
+
+    const dead = groups
+      .filter((g) => !g.children!.some((c) => isEnabled(c.href)))
+      .map((g) => g.label)
+
+    // A group may legitimately be entirely unbuilt. What must never happen is a
+    // group whose children are live being reported as dead, so this records
+    // which groups are which and fails when a live one regresses.
+    expect(dead).toEqual([])
+  })
+
+  it("routes every platform child through the same isEnabled the header reads", () => {
+    for (const group of NAV.flatMap((g) => g.items).filter((i) => i.children?.length)) {
+      for (const child of group.children!) {
+        expect(ENABLED_ROUTES.includes(child.href)).toBe(isEnabled(child.href))
+      }
+    }
+  })
+})

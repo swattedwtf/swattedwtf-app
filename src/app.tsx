@@ -13,6 +13,7 @@ import { Home } from "./dashboard/Home"
 import { ModuleScreen } from "./modules/ModuleScreen"
 import { StreamScreen } from "./modules/StreamScreen"
 import { ApiAccess } from "./modules/api-access"
+import { Plans } from "./modules/plans"
 import { FaceScreen } from "./modules/face"
 import { Investigations } from "./investigations/Investigations"
 import { MonitorScreen } from "./modules/monitor"
@@ -268,10 +269,16 @@ export default function App() {
               // passed for the wallet balance: this is the one screen where
               // pressing Search spends money outright.
               <FaceScreen overview={overview} />
+            ) : route === "/plans" ? (
+              // Not a module either: nothing is searched for and nothing is
+              // metered. It renders the tiers the server priced in the same
+              // Overview, and hands the purchase itself to the web checkout,
+              // which is where payment and fulfillment live.
+              <Plans overview={overview} onNavigate={setRoute} />
             ) : route === "/settings" ? (
               <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
             ) : (
-              <Home overview={overview} />
+              <Home overview={overview} onNavigate={setRoute} />
             )}
           </Shell>
         </>

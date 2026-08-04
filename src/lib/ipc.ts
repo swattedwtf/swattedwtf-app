@@ -38,6 +38,46 @@ export type Overview = {
     expiresAt: string | null
     key: string | null
   }
+  /**
+   * The tier catalog, priced by the server for this account.
+   *
+   * Carried here rather than written into the client because a price is a
+   * promise: the server charges from this same table, so a client with its own
+   * copy would eventually show one number and bill another. An older server
+   * that does not send it yields an empty `tiers`, which the Plans screen
+   * reports as a catalog it could not load rather than as a free product.
+   */
+  plans: {
+    /** The plan the account holds right now. */
+    currentId: string
+    /** Account-wide percent off applied to a paid tier today. 0 when none. */
+    discountPercent: number
+    tiers: PlanTier[]
+  }
+}
+
+/**
+ * One purchasable tier.
+ *
+ * `priceUsd` is the list price; `yourPriceUsd` is what THIS account pays, after
+ * the Premium -> Heist upgrade credit and any account discount the server
+ * already applied. `relation` is the server's own reading of where the tier
+ * sits against the current plan, so the client never re-derives the ordering
+ * and cannot present a downgrade as something to buy.
+ */
+export type PlanTier = {
+  id: string
+  name: string
+  shortName: string
+  term: string
+  lifetime: boolean
+  badge: string | null
+  highlight: boolean
+  includes: string | null
+  features: string[]
+  priceUsd: number
+  yourPriceUsd: number
+  relation: "current" | "upgrade" | "downgrade" | "default"
 }
 
 /**

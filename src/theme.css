@@ -24,12 +24,47 @@
   --mark-fg: #ffffff;
   --mark-tld: #404040;
 
-  /* Liquid glass. */
-  /* Liquid glass. Saturation is what makes it read as glass rather than as a
-     grey card: it pulls colour out of whatever is behind and lets it bloom
-     through the surface. Blur alone just looks like fog. */
-  --glass-filter: blur(30px) saturate(2.1) brightness(1.08) contrast(1.04);
+  /* Liquid glass, ported verbatim from the web's app/globals.css.
+     -------------------------------------------------------------------
+     The important part is what the web does NOT do: it never replaces an
+     element's background. A card keeps its own near-black --card colour at
+     partial opacity and gets only backdrop-filter, a specular top edge and a
+     layered shadow. The glass is the LENS, not the fill.
+
+     This file previously did the opposite: it swapped the fill for a light
+     white film, on the theory that glass should be a bright thin sheet. Over
+     the dashboard artwork that film had nothing dark behind it, so foreground
+     text sat on a pale wash and became genuinely hard to read. Matching the
+     web fixes the look and the legibility at the same time, because a fill of
+     oklch(0.08) at 60% is still nearly black. */
+  --glass-filter: blur(22px) saturate(1.8) brightness(1.06) contrast(1.03);
   --glass-edge: oklch(1 0 0 / 0.2);
+  /* Layered to fake a lit sheet of glass: top rim-light, a directional
+     top-left specular sheen plus bottom-right depth (so the pane looks lit
+     from above-left), a hairline inner border, then the ambient float and
+     contact shadows. */
+  --glass-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.16),
+    inset 8px 8px 20px -18px oklch(1 0 0 / 0.28),
+    inset -8px -10px 22px -20px oklch(0 0 0 / 0.55),
+    inset 0 0 0 1px oklch(1 0 0 / 0.04),
+    0 16px 40px -18px oklch(0 0 0 / 0.66),
+    0 3px 10px -5px oklch(0 0 0 / 0.45);
+  /* The two fills. Panels are the floating cards, chrome is the sidebar,
+     fields and chips, exactly the web's two tiers. */
+  --glass-panel-fill: oklch(0.08 0 0 / 0.62);
+  --glass-chrome-fill: oklch(0.14 0 0 / 0.55);
+
+  /* Corner radii, all derived from --radius so the Roundness control in
+     Settings actually moves the surfaces people look at.
+     They were hardcoded at 16/15/12/10px, which meant --radius only ever
+     reached Tailwind's `rounded-lg` (16 usages in the whole app) and the
+     slider was honest but very nearly invisible. At the default 0.5rem these
+     evaluate to exactly the old numbers, so nothing moves until asked. */
+  --glass-radius: calc(var(--radius) * 2);
+  --glass-radius-inner: calc(var(--radius) * 2 - 1px);
+  --glass-radius-tile: calc(var(--radius) * 1.5);
+  --glass-radius-input: calc(var(--radius) * 1.25);
 }
 
 @theme inline {
@@ -107,54 +142,51 @@ textarea {
 .glass {
   position: relative;
   border: 0;
-  border-radius: 16px;
-  /* A LIGHT, highly translucent fill. This used to be rgba(21,21,21,0.72), an
-     almost-opaque dark slab with a little blur behind it, which is a dark card
-     and not glass at all: nothing of the backdrop survived it. Glass works the
-     other way round, a bright thin film that the thing behind it shows through,
-     with the blur and the saturation doing the work. */
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.10) 0%,
-    rgba(255, 255, 255, 0.045) 45%,
-    rgba(255, 255, 255, 0.025) 100%
-  );
+  border-top: 1px solid var(--glass-edge);
+  border-radius: var(--glass-radius);
+  /* Near-black, translucent. The lens does the work, not the fill. */
+  background: var(--glass-panel-fill);
   backdrop-filter: var(--glass-filter);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.30),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.06),
-    0 24px 60px -30px rgba(0, 0, 0, 0.85);
+  -webkit-backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-shadow);
 }
 
-/* Two-element form: the outer element becomes the gradient frame only. Its own
-   backdrop-filter is dropped, or the body would blur an already-blurred
-   backdrop and the surface would go milky. */
+/* Two-element form: the outer element is the frame, the body is the surface.
+   Only ONE of the two may carry a backdrop-filter, because an element with one
+   becomes a backdrop root for its descendants: a nested filter then samples its
+   parent's already-composited output rather than the page, so it blurs a flat
+   colour and contributes nothing but cost. The body is the one that keeps it. */
 .glass:has(> .glass-body) {
   padding: 1px;
+  border-top-color: transparent;
   backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.14) 0%,
-    rgba(255, 255, 255, 0.05) 38%,
-    rgba(255, 255, 255, 0.02) 100%
+    oklch(1 0 0 / 0.14) 0%,
+    oklch(1 0 0 / 0.05) 38%,
+    oklch(1 0 0 / 0.02) 100%
   );
   box-shadow:
-    0 28px 70px -40px rgba(0, 0, 0, 0.95),
-    0 2px 8px -4px rgba(0, 0, 0, 0.6);
+    0 16px 40px -18px oklch(0 0 0 / 0.66),
+    0 3px 10px -5px oklch(0 0 0 / 0.45);
 }
 
 .glass > .glass-body {
   position: relative;
   overflow: hidden;
-  border-radius: 15px;
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.085) 0%,
-    rgba(255, 255, 255, 0.04) 45%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
+  border-radius: var(--glass-radius-inner);
+  border-top: 1px solid var(--glass-edge);
+  background: var(--glass-panel-fill);
   backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  /* The inner half of the shared stack. The frame above owns the float and
+     contact shadows, so repeating them here would double the drop. */
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.16),
+    inset 8px 8px 20px -18px oklch(1 0 0 / 0.28),
+    inset -8px -10px 22px -20px oklch(0 0 0 / 0.55),
+    inset 0 0 0 1px oklch(1 0 0 / 0.04);
   padding: 20px;
 }
 
@@ -167,7 +199,7 @@ textarea {
   right: 20px;
   top: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.30), transparent);
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.30), transparent);
 }
 
 /* The same grain the backdrop uses, so panels are not the only perfectly
@@ -186,10 +218,10 @@ textarea {
 /* Without backdrop-filter a translucent fill shows the raw artwork through the
    text, so the fallback goes solid. Legibility beats the effect. */
 @supports not (backdrop-filter: blur(1px)) {
-  .glass { background: linear-gradient(180deg, #1a1a1a, #101010); }
-  .glass > .glass-body { background: linear-gradient(180deg, #1a1a1a, #101010); }
-  .glass-tile { background: #191919; }
-  .glass-input { background: #121212; }
+  .glass { background: oklch(0.08 0 0); }
+  .glass > .glass-body { background: oklch(0.08 0 0); }
+  .glass-tile { background: oklch(0.14 0 0); }
+  .glass-input { background: oklch(0.02 0 0); }
 }
 
 /* A sub-surface: tiles, chips, wells and empty states inside a .glass panel.
@@ -197,15 +229,41 @@ textarea {
    over an already-blurred backdrop reads as milk rather than as glass. The
    1px top highlight is the whole trick: it is what makes an edge look like it
    catches light instead of like a border. */
+/* The web's CHROME tier: the same lens and the same top edge, but no float
+   shadow, so it sits flush on the panel instead of hovering over it.
+
+   The fill is opaque enough to read on its own because a tile is usually
+   nested INSIDE a .glass panel, and a panel carries a backdrop-filter, which
+   makes it a backdrop root: the tile's own filter then samples the panel's
+   composited output rather than the page behind, so it blurs a flat colour and
+   changes nothing. That is why the old tile looked like a plain grey rectangle
+   no matter how much blur it asked for. The filter stays for the tiles that do
+   sit at the top level, where it genuinely lenses, and the fill carries the
+   surface everywhere else. */
 .glass-tile {
   position: relative;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022));
-  backdrop-filter: blur(12px) saturate(1.5);
+  border-radius: var(--glass-radius-tile);
+  border-top: 1px solid var(--glass-edge);
+  background: var(--glass-chrome-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-    0 8px 24px -18px rgba(0, 0, 0, 0.9);
+    inset 0 1px 0 0 oklch(1 0 0 / 0.10),
+    inset 0 0 0 1px oklch(1 0 0 / 0.05);
+}
+
+/* Usage meters. A shared pair so the API card, the stat cards and settings all
+   draw the same bar: the track is a recess in the surface, the fill is a lit
+   ridge sitting in it, rather than two flat white washes at different opacities
+   as each of the three had invented separately. */
+.meter {
+  background: oklch(0 0 0 / 0.45);
+  box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.06);
+}
+
+.meter-fill {
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.95), oklch(1 0 0 / 0.72));
+  box-shadow: 0 0 12px -2px oklch(1 0 0 / 0.45);
 }
 
 /* Interactive version: lifts on hover the way the stat cards do. */
@@ -216,11 +274,11 @@ textarea {
 }
 
 .glass-tile-hover:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03));
+  background: oklch(0.19 0 0 / 0.66);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.11),
-    0 10px 28px -18px rgba(0, 0, 0, 0.9);
+    inset 0 1px 0 0 oklch(1 0 0 / 0.18),
+    inset 0 0 0 1px oklch(1 0 0 / 0.09),
+    0 10px 28px -18px oklch(0 0 0 / 0.9);
 }
 
 /* The sidebar. A full-height pane rather than a card, so it gets its own rule:
@@ -228,13 +286,14 @@ textarea {
    nav has to stay readable over whatever the artwork is doing, plus a hairline
    on the inner edge instead of a plain border. */
 .glass-rail {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.07) 0%,
-    rgba(255, 255, 255, 0.035) 100%
-  );
-  backdrop-filter: blur(30px) saturate(2) brightness(1.04);
-  box-shadow: inset -1px 0 0 0 rgba(255, 255, 255, 0.10);
+  /* Chrome tier, on the app background rather than the card colour: the rail is
+     a wall, not a floating card. Denser than a panel because the nav has to
+     stay readable over whatever the artwork is doing behind it. */
+  background: oklch(0.04 0 0 / 0.72);
+  border-top: 1px solid var(--glass-edge);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  box-shadow: inset -1px 0 0 0 oklch(1 0 0 / 0.08);
 }
 
 @supports not (backdrop-filter: blur(1px)) {
@@ -247,26 +306,32 @@ textarea {
    rather than as a tile sitting on top. */
 .glass-input {
   border: 0;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.03));
-  backdrop-filter: blur(10px) saturate(1.4);
+  border-radius: var(--glass-radius-input);
+  /* A well, so it is darker than the panel it sits in rather than lighter. The
+     rim is a real hairline at the web's --border, which is what makes a field
+     look like a field instead of a smudge. */
+  background: oklch(0.02 0 0 / 0.55);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   box-shadow:
-    inset 0 1px 3px 0 rgba(0, 0, 0, 0.45),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+    inset 0 1px 3px 0 oklch(0 0 0 / 0.5),
+    inset 0 -1px 0 0 oklch(1 0 0 / 0.07),
+    inset 0 0 0 1px oklch(1 0 0 / 0.10);
   color: #fff;
   transition: box-shadow 160ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Was 0.28, which was below the web's own muted text and read as an empty box
+   rather than as a prompt. Matches --muted-foreground now. */
 .glass-input::placeholder {
-  color: rgba(255, 255, 255, 0.28);
+  color: oklch(0.62 0 0);
 }
 
 .glass-input:hover:not(:disabled) {
   box-shadow:
-    inset 0 1px 3px 0 rgba(0, 0, 0, 0.45),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.10),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    inset 0 1px 3px 0 oklch(0 0 0 / 0.5),
+    inset 0 -1px 0 0 oklch(1 0 0 / 0.10),
+    inset 0 0 0 1px oklch(1 0 0 / 0.16);
 }
 
 /* ---- Buttons ------------------------------------------------------------
@@ -284,7 +349,7 @@ textarea {
   gap: 8px;
   height: 40px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--glass-radius-input);
   font-weight: 500;
   font-size: 14px;
   line-height: 1;

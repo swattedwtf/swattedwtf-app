@@ -43,6 +43,8 @@ function overviewWith(balanceCents: number): Overview {
       expiresAt: null,
       key: null,
     },
+    // The tier catalog is the Plans screen's concern; empty here.
+    plans: { currentId: "free", discountPercent: 0, tiers: [] },
   }
 }
 

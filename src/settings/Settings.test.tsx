@@ -54,6 +54,8 @@ const overview: Overview = {
     expiresAt: null,
     key: null,
   },
+  // The tier catalog is the Plans screen's concern; empty here.
+  plans: { currentId: "plus", discountPercent: 0, tiers: [] },
 }
 
 const view: SettingsView = {

@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 
-import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./index"
+import {
+  BadgeRow,
+  EmptyState,
+  FieldGrid,
+  LockedSection,
+  ProfileCard,
+  RecordCard,
+  Section,
+  StatTiles,
+  type StatTile,
+} from "./index"
 
 vi.mock("../../lib/ipc", () => ({ ipc: { openExternal: vi.fn(), fetchImage: vi.fn() } }))
 
@@ -126,5 +136,74 @@ describe("BadgeRow shows the art, not the art plus its name", () => {
     // Otherwise the entry would be invisible.
     const html = renderToStaticMarkup(<BadgeRow badges={[{ label: "Staff", iconUrl: null }]} />)
     expect(html).toContain(">Staff<")
+  })
+})
+
+describe("StatTiles", () => {
+  it("renders each tile's value loud and its label and caption quietly", () => {
+    const tiles: StatTile[] = [
+      { label: "Records", value: 12, caption: "leaked records found" },
+      { label: "Passwords", value: 3, caption: "exposed secrets" },
+    ]
+    const html = renderToStaticMarkup(<StatTiles tiles={tiles} />)
+    for (const tile of tiles) {
+      expect(html).toContain(tile.label)
+      expect(html).toContain(`>${tile.value}<`)
+      if (tile.caption) expect(html).toContain(tile.caption)
+    }
+    // The number is on the loud surface, not the muted one.
+    expect(html).toContain("text-white")
+  })
+
+  it("renders nothing rather than an empty row when there are no tiles", () => {
+    expect(renderToStaticMarkup(<StatTiles tiles={[]} />)).toBe("")
+  })
+})
+
+describe("RecordCard", () => {
+  it("draws the source header, the field values and a copy control", () => {
+    const html = renderToStaticMarkup(
+      <RecordCard
+        record={{
+          source: "LeakDB",
+          fields: [
+            { label: "Email", value: "a@b.co" },
+            { label: "Password", value: "hunter2", sensitive: true },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain("LeakDB")
+    expect(html).toContain("a@b.co")
+    expect(html).toContain("hunter2")
+    // Two fields, pluralised.
+    expect(html).toContain("2 fields")
+    // Every field row offers a copy affordance.
+    expect(html).toContain("aria-label=\"Copy email\"")
+  })
+
+  it("tints a sensitive value and leaves an ordinary one white", () => {
+    const html = renderToStaticMarkup(
+      <RecordCard
+        record={{ source: "S", fields: [{ label: "Password", value: "pw", sensitive: true }] }}
+      />,
+    )
+    expect(html).toContain("text-amber-200")
+  })
+
+  it("truncates a long url but keeps the whole string on the copy title", () => {
+    const long = "https://example.com/" + "x".repeat(60)
+    const html = renderToStaticMarkup(
+      <RecordCard record={{ source: "S", fields: [{ label: "URL", value: long }] }} />,
+    )
+    expect(html).toContain(`Copy ${long}`)
+    expect(html).toContain("…")
+  })
+
+  it("uses no em dashes", () => {
+    const html = renderToStaticMarkup(
+      <RecordCard record={{ source: "S", fields: [{ label: "Email", value: "a@b.co" }] }} />,
+    )
+    expect(html).not.toContain("—")
   })
 })

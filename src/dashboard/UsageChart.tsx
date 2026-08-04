@@ -8,7 +8,7 @@ const H = 32
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2.5">
+    <div className="glass-tile px-3 py-2.5">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
         {label}
       </p>

@@ -7,14 +7,21 @@ import { openWeb } from "./QuickActions"
 const API_URL = "https://swattedw.tf/dashboard/api"
 const DOCS_URL = "https://swattedw.tf/dashboard/api/docs"
 
-const pillClass =
-  "inline-flex h-9 items-center gap-2 rounded-md border border-white/10 bg-black/30 px-3 text-sm font-medium transition-colors hover:border-white/20 hover:bg-white/[0.05]"
+/**
+ * These three were the app's flattest surfaces, and they sit on the first
+ * screen after login. Each was a hand-rolled `border-white/10 bg-black/30`
+ * rectangle: an opaque wafer with a hairline, which is the exact look the glass
+ * system exists to replace. They are the shared classes now, so they pick up
+ * the same material, the same lensing and the same solid fallback on a WebView
+ * without backdrop-filter as everything else.
+ */
+const pillClass = "btn-secondary btn-compact"
 
-const fieldClass =
-  "flex-1 select-text truncate rounded-md border border-white/10 bg-black/30 px-3 py-2.5 font-mono text-sm"
+/** A value to be read and copied, so it is a well, like every other code field. */
+const fieldClass = "glass-input flex-1 select-text truncate px-3 py-2.5 font-mono text-sm"
 
 const iconBtnClass =
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/30 text-[var(--muted-foreground)] transition-colors hover:border-white/20 hover:bg-white/[0.05] hover:text-white"
+  "glass-tile glass-tile-hover flex h-10 w-10 shrink-0 items-center justify-center text-[var(--muted-foreground)] transition-colors hover:text-white"
 
 const labelClass =
   "font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]"
@@ -63,7 +70,7 @@ function ApiAccessCard({ api }: { api: Overview["api"] }) {
           <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
             API Access
           </h2>
-          <span className="rounded-full border border-white/10 bg-black/30 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]">
+          <span className="glass-tile rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]">
             {tierLabel ?? "API Access"}
           </span>
         </div>
@@ -98,9 +105,9 @@ function ApiAccessCard({ api }: { api: Overview["api"] }) {
       </div>
 
       {dailyLimit !== null && (
-        <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="meter mt-4 h-1.5 w-full overflow-hidden rounded-full">
           <div
-            className="h-full rounded-full bg-white/80 transition-[width]"
+            className="meter-fill h-full rounded-full transition-[width]"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -191,7 +198,7 @@ function ApiCredentialsCard({ apiKey, userNumber }: { apiKey: string | null; use
         </div>
       </div>
 
-      <div className="mt-5 border-t border-white/10 pt-5">
+      <div className="mt-5 border-t border-white/[0.08] pt-5">
         {/* Rotation is a write, and this app has no command for it. Rather than
             fake a button that cannot work, hand the job to the web dashboard. */}
         <button type="button" onClick={() => void openWeb(API_URL)} className={pillClass}>

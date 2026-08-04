@@ -34,7 +34,7 @@ export function StatCard({
     <div className="glass stat-card">
       <div className="glass-body">
         <div className="stat-head flex items-start gap-4">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-white/5">
+          <div className="glass-tile grid h-9 w-9 shrink-0 place-items-center rounded-xl">
             {icon}
           </div>
           <div className="min-w-0 flex-1">
@@ -46,7 +46,7 @@ export function StatCard({
         </div>
 
         {typeof progress === "number" && (
-          <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="meter mt-4 h-1 w-full overflow-hidden rounded-full">
             <div
               className="stat-fill h-full rounded-full"
               style={{ "--fill": `${pct}%` } as CSSProperties}

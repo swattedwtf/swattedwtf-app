@@ -113,6 +113,7 @@ export const NAV: NavGroup[] = [
     label: "Resources",
     items: [
       { label: "API Access", href: "/api" },
+      { label: "Plans", href: "/plans" },
       { label: "Support", href: "https://t.me/swatted_bot", external: true },
     ],
   },

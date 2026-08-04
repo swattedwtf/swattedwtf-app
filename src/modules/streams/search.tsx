@@ -1,6 +1,8 @@
+import { Database, KeyRound, Layers, Radar } from "lucide-react"
+
 import { list } from "../safe"
-import { EmptyState, FieldGrid, Section, type Field } from "../ui"
-import type { StreamFrame, StreamModuleDescriptor, StreamResultProps } from "../stream-types"
+import { EmptyState, RecordCard, StatTiles, type LeakField, type LeakRecord, type StatTile } from "../ui"
+import type { StreamFrame, StreamModuleDescriptor, StreamResultProps, StreamStatus } from "../stream-types"
 
 /**
  * Search: breach records streamed as each source finishes.
@@ -18,8 +20,8 @@ const USERNAME_RE = /^@?[A-Za-z0-9._-]{2,32}$/
 // obviously-not-a-domain value from becoming a metered request.
 const DOMAIN_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/.*)?$/i
 
-type RecordField = { label?: unknown; value?: unknown; sensitive?: unknown }
-type LeakRecord = { source?: unknown; fields?: unknown }
+type RawField = { label?: unknown; value?: unknown; sensitive?: unknown }
+type RawRecord = { source?: unknown; fields?: unknown }
 
 /** A stable, human string from an untrusted field. */
 function text(value: unknown): string {
@@ -31,21 +33,21 @@ function text(value: unknown): string {
  * field values, exactly as the web page does. Re-derived from all frames on each
  * render, so the view always reflects precisely what has arrived.
  */
-function mergedRecords(frames: StreamFrame[]): { source: string; fields: Field[] }[] {
+function mergedRecords(frames: StreamFrame[]): LeakRecord[] {
   const seen = new Set<string>()
-  const out: { source: string; fields: Field[] }[] = []
+  const out: LeakRecord[] = []
   for (const frame of frames) {
     if (frame.t !== "progress") continue
-    for (const raw of list<LeakRecord>(frame.records)) {
+    for (const raw of list<RawRecord>(frame.records)) {
       const source = text(raw?.source) || "Unknown source"
-      const fields: Field[] = list<RecordField>(raw?.fields).map((f) => ({
+      const fields: LeakField[] = list<RawField>(raw?.fields).map((f) => ({
         label: text(f?.label),
         value: text(f?.value),
-        // A leaked password reads better monospaced, like every other opaque
-        // value in the app.
-        mono: f?.sensitive === true,
+        // The server's own sensitivity flag: a captured secret, tinted and
+        // monospaced so it never reads as ordinary profile text.
+        sensitive: f?.sensitive === true,
       }))
-      const key = `${source}|${fields.map((f) => `${f.label}=${String(f.value)}`).join("|")}`
+      const key = `${source}|${fields.map((f) => `${f.label}=${f.value}`).join("|")}`
       if (seen.has(key)) continue
       seen.add(key)
       out.push({ source, fields })
@@ -73,44 +75,110 @@ function progress(frames: StreamFrame[]): { checked: number; total: number; hits
   return { checked, total, hits }
 }
 
+/** A leaked secret is any field the server flagged sensitive. */
+function secretCount(records: LeakRecord[]): number {
+  let n = 0
+  for (const r of records) for (const f of r.fields) if (f.sensitive) n += 1
+  return n
+}
+
+/** The distinct sources that actually returned a record. */
+function sourceCount(records: LeakRecord[]): number {
+  return new Set(records.map((r) => r.source)).size
+}
+
+/**
+ * The summary tiles that open the result, deriving every figure from the frames
+ * so the row always states exactly what has arrived. This mirrors the web page's
+ * Records / Passwords / Sources header rather than the old flat field grid.
+ */
+function summaryTiles(
+  records: LeakRecord[],
+  counters: { checked: number; total: number; hits: number },
+): StatTile[] {
+  const { checked, total, hits } = counters
+  const sources = sourceCount(records)
+  return [
+    {
+      icon: Database,
+      label: "Records",
+      value: records.length,
+      caption: records.length === 1 ? "leaked record found" : "leaked records found",
+    },
+    {
+      icon: KeyRound,
+      label: "Passwords",
+      value: secretCount(records),
+      caption: "exposed secrets",
+    },
+    {
+      icon: Layers,
+      label: "Sources",
+      value: sources,
+      caption: `${hits} of ${checked} returned data`,
+    },
+    {
+      icon: Radar,
+      label: "Queried",
+      value: total > 0 ? `${checked}/${total}` : String(checked),
+      caption: total > 0 ? "sources checked" : "sources checked so far",
+    },
+  ]
+}
+
+/** Copy for the empty state, distinguishing a failed sweep from a clean miss. */
+function emptyMessage(status: StreamStatus): string {
+  if (status === "streaming") {
+    return "Querying breach sources. Records appear here as each source answers."
+  }
+  if (status === "cancelled") return "Search cancelled before any records were found."
+  if (status === "error") return "The search stopped before finishing. Retry to run it again."
+  return "No records found for this search."
+}
+
 function SearchResult({ frames, status }: StreamResultProps) {
   const records = mergedRecords(frames)
-  const { checked, total, hits } = progress(frames)
-
-  const summary: Field[] = [
-    { label: "Sources checked", value: total > 0 ? `${checked} of ${total}` : String(checked) },
-    { label: "Sources with hits", value: String(hits) },
-    { label: "Records", value: String(records.length) },
-  ]
+  const counters = progress(frames)
+  const streaming = status === "streaming"
 
   return (
-    <div className="space-y-4">
-      <Section title={status === "streaming" ? "Searching sources" : "Sweep summary"}>
-        <FieldGrid fields={summary} />
-      </Section>
+    <div className="space-y-5">
+      <StatTiles tiles={summaryTiles(records, counters)} />
+
+      {streaming ? (
+        <div className="glass-tile flex items-center gap-3 px-4 py-2.5 text-[12px] text-white/70">
+          <span
+            className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--color-positive)]"
+            aria-hidden="true"
+          />
+          <span>
+            Searching sources. {records.length}{" "}
+            {records.length === 1 ? "record" : "records"} so far across {sourceCount(records)}{" "}
+            {sourceCount(records) === 1 ? "source" : "sources"}.
+          </span>
+        </div>
+      ) : null}
 
       {records.length === 0 ? (
-        <EmptyState
-          message={
-            status === "streaming"
-              ? "Querying breach sources. Records appear here as each source answers."
-              : status === "cancelled"
-                ? "Search cancelled before any records were found."
-                : status === "error"
-                  ? "The search stopped before finishing. Retry to run it again."
-                  : "No records found for this search."
-          }
-        />
+        <EmptyState message={emptyMessage(status)} />
       ) : (
-        records.map((record, i) => (
-          <Section key={`${record.source}-${i}`} title={record.source}>
-            <FieldGrid fields={record.fields} />
-          </Section>
-        ))
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-white">Breach and leak records</h3>
+            <span className="glass-tile px-1.5 py-0.5 font-mono text-[10px] text-white/70">
+              {records.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {records.map((record, i) => (
+              <RecordCard key={`${record.source}-${i}`} record={record} />
+            ))}
+          </div>
+        </section>
       )}
 
       {status === "cancelled" && records.length > 0 ? (
-        <p className="text-[12px] text-[var(--color-muted-foreground)]">
+        <p className="text-[12px] text-white/60">
           Cancelled. Showing the sources that answered before you stopped.
         </p>
       ) : null}
