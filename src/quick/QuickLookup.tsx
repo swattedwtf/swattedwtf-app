@@ -5,6 +5,9 @@ import { ipc } from "../lib/ipc"
 import { KIND_LABEL, identify, targetUrl } from "./identify"
 import "../theme.css"
 
+/** Longest input worth accepting. Nothing we can look up is near this. */
+const MAX_LENGTH = 256
+
 /**
  * The quick-lookup overlay.
  *
@@ -21,6 +24,11 @@ import "../theme.css"
 export function QuickLookup() {
   const [value, setValue] = useState("")
   const [busy, setBusy] = useState(false)
+  // Bumped on every show. Used as a React key so the panel remounts and replays
+  // its entrance: the window is created hidden at startup and then only shown
+  // and hidden, so an animation keyed on mount would have played once, before
+  // the window was ever visible, and never again.
+  const [shown, setShown] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const match = identify(value)
@@ -31,11 +39,15 @@ export function QuickLookup() {
   }
 
   useEffect(() => {
-    // Focus on every show, not just first mount: the window is hidden and
-    // reshown rather than recreated, so mount happens exactly once.
-    const focus = () => inputRef.current?.focus()
-    focus()
-    window.addEventListener("focus", focus)
+    // Focus on every show, not just first mount, for the same reason the
+    // entrance is keyed: mount happens exactly once, at startup.
+    const onShow = () => {
+      setShown((n) => n + 1)
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+    onShow()
+    window.addEventListener("focus", onShow)
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") dismiss()
@@ -48,7 +60,7 @@ export function QuickLookup() {
     window.addEventListener("blur", onBlur)
 
     return () => {
-      window.removeEventListener("focus", focus)
+      window.removeEventListener("focus", onShow)
       window.removeEventListener("keydown", onKey)
       window.removeEventListener("blur", onBlur)
     }
@@ -68,45 +80,60 @@ export function QuickLookup() {
     }
   }
 
+  const typed = value.trim() !== ""
+
   return (
-    <div className="quick-root flex h-full flex-col justify-center px-4">
-      <div className="flex items-center gap-3">
-        <Search className="h-[18px] w-[18px] shrink-0 text-white/35" aria-hidden="true" />
-
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void submit()}
-          placeholder="Paste an ID, email, phone, domain or username"
-          spellCheck={false}
-          autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent text-[17px] text-white outline-none placeholder:text-white/25"
-        />
-
-        {match && (
-          <span className="shrink-0 rounded-full border border-white/12 bg-white/[0.06] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.1em] text-white/60">
-            {KIND_LABEL[match.kind]}
+    <div className="quick-root" data-armed={Boolean(match)}>
+      <div key={shown} className="quick-body quick-enter">
+        <div className="flex flex-1 items-center gap-3 px-3.5">
+          <span className="quick-glyph" aria-hidden="true">
+            <Search className="h-[17px] w-[17px]" />
           </span>
-        )}
-      </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-2.5 text-[11px] text-white/30">
-        <span className="truncate">
-          {value.trim() === ""
-            ? "swatted.wtf quick lookup"
-            : match
-              ? `Look up ${match.value}`
-              : "Not a recognisable identifier"}
-        </span>
+          <input
+            ref={inputRef}
+            value={value}
+            maxLength={MAX_LENGTH}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void submit()}
+            placeholder="Search an ID, email, phone, domain or username"
+            spellCheck={false}
+            autoComplete="off"
+            aria-label="Quick lookup"
+            className="quick-input"
+          />
 
-        <span className="flex shrink-0 items-center gap-3">
-          <span className="flex items-center gap-1">
-            <CornerDownLeft className="h-3 w-3" aria-hidden="true" />
-            open
+          {match && <span className="quick-pill">{KIND_LABEL[match.kind]}</span>}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-white/[0.06] px-3.5 py-2.5">
+          <span className="truncate text-[11px] text-white/35">
+            {!typed ? (
+              <>
+                <span className="text-white/55">swatted</span>
+                <span className="text-white/25">.wtf</span>
+                <span className="px-1.5 text-white/15">/</span>
+                quick lookup
+              </>
+            ) : match ? (
+              <>
+                Open <span className="text-white/70">{KIND_LABEL[match.kind].toLowerCase()}</span>{" "}
+                lookup for <span className="text-white/70">{match.value}</span>
+              </>
+            ) : (
+              "Not a recognisable identifier"
+            )}
           </span>
-          <span>esc close</span>
-        </span>
+
+          <span className="flex shrink-0 items-center gap-2 text-[11px] text-white/30">
+            <kbd className="kbd" aria-hidden="true">
+              <CornerDownLeft className="h-3 w-3" />
+            </kbd>
+            <span>open</span>
+            <kbd className="kbd ml-1.5">esc</kbd>
+            <span>close</span>
+          </span>
+        </div>
       </div>
     </div>
   )

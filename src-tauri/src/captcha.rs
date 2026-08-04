@@ -89,7 +89,7 @@ pub async fn solve(app: &AppHandle) -> Result<String, AppError> {
             // trusted-looking app: an open redirect on the captcha page, or a
             // compromised CDN, would turn it into a phishing surface, and it
             // would happily render file:// and data:: documents.
-            is_api_origin(&u)
+            is_api_origin(u)
         })
         .build()
         .map_err(|e| AppError::Internal(e.to_string()))?;

@@ -30,7 +30,7 @@ export function UpdateReadyScreen({
   }
 
   return (
-    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 boot-surface px-10">
       <p className="text-[26px] font-medium tracking-[-0.02em]">
         swatted<span className="text-[var(--mark-tld)]">.wtf</span>
       </p>

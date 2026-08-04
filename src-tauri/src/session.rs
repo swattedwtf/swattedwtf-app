@@ -16,6 +16,15 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 /// Serialises a cookie jar to the newline-delimited JSON that cookie_store emits.
+///
+/// save_json and load_json below are deprecated in favour of cookie_store's
+/// serde modules, which serialise EVERY cookie including session cookies. That
+/// difference is load-bearing here rather than stylistic: dropping
+/// non-persistent cookies on save is exactly what we want from a credential
+/// store, and there is a test pinning it. Migrating would mean writing the
+/// filter by hand for no gain, so the deprecation is allowed rather than
+/// followed.
+#[allow(deprecated)]
 pub fn encode_jar(jar: &CookieStore) -> Result<String, AppError> {
     let mut buf = Vec::new();
     jar.save_json(&mut buf)
@@ -30,6 +39,7 @@ pub fn encode_jar(jar: &CookieStore) -> Result<String, AppError> {
 /// produces exactly that, so rejecting it would break our own save/load cycle.
 /// Non-empty input that does not parse IS corruption and errors, so a damaged
 /// keychain entry stays visible instead of silently masquerading as a logout.
+#[allow(deprecated)] // Pairs with encode_jar; see the note there.
 pub fn decode_jar(blob: &str) -> Result<CookieStore, AppError> {
     if blob.trim().is_empty() {
         return Ok(CookieStore::default());

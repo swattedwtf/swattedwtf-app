@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<
         {this.props.chrome}
         <div
           data-tauri-drag-region
-          className="drag flex h-full flex-col items-center justify-center gap-4 bg-[#0b0b0b] px-10"
+          className="drag flex h-full flex-col items-center justify-center gap-4 boot-surface px-10"
         >
           <h1 className="text-lg font-semibold tracking-tight">Something broke</h1>
           <p className="max-w-[380px] text-center text-xs leading-relaxed text-[var(--color-muted-foreground)]">

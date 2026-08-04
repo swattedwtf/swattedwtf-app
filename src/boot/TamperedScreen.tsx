@@ -23,7 +23,7 @@ export function TamperedScreen({
   const rest = changedFiles.length - shown.length
 
   return (
-    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 boot-surface px-10">
       <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[var(--color-warning)]/40 text-lg text-[var(--color-warning)]">
         !
       </div>

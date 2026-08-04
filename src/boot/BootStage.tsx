@@ -66,8 +66,13 @@ export function BootStage({
       data-mode={mode}
       data-leaving={leaving}
     >
+      {/* The dashboard's three layers, dimmed right down, so the app opens on
+          the same material the web does instead of on a black rectangle. */}
+      <div className="stage-art" aria-hidden="true" />
+      <div className="stage-wash" aria-hidden="true" />
       <div className="stage-glow" aria-hidden="true" />
       <div className="stage-grain" aria-hidden="true" />
+      <div className="stage-edge" aria-hidden="true" />
 
       <div className="stage-inner">
         <p className="stage-mark">
@@ -105,21 +110,32 @@ export function BootStage({
   )
 }
 
-/** A hairline arc on a faint track, with a slower counter-rotating inner arc. */
+/**
+ * A hairline arc on a faint track, with a slower counter-rotating inner arc and
+ * a bright head at the leading tip.
+ *
+ * The head is a separate circle rather than part of the dash, because a dash cap
+ * cannot be brighter than the dash it caps. It sits at the coordinates the tip
+ * of the sweep reaches (see below) and shares the arc's animation exactly, so
+ * the two stay locked together for as long as the ring turns.
+ */
 function Ring() {
+  // An SVG circle's stroke starts at 3 o'clock and runs clockwise, so the tip of
+  // a 40-unit dash on a radius-30 circle (circumference 188.5) sits 40/188.5 of
+  // a turn along: 76.4 degrees, which is (36 + 30cos, 36 + 30sin) = 43.1, 65.2.
   return (
     <svg viewBox="0 0 72 72" width="66" height="66" aria-hidden="true">
-      <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1.5" />
+      <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
       <circle
         className="stage-ring-arc-inner"
         cx="36"
         cy="36"
         r="23"
         fill="none"
-        stroke="rgba(255,255,255,0.32)"
+        stroke="rgba(255,255,255,0.28)"
         strokeWidth="1"
         strokeLinecap="round"
-        strokeDasharray="18 120"
+        strokeDasharray="16 128"
       />
       <circle
         className="stage-ring-arc"
@@ -127,11 +143,22 @@ function Ring() {
         cy="36"
         r="30"
         fill="none"
-        stroke="#fff"
+        stroke="url(#stageSweep)"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeDasharray="40 180"
       />
+      <circle className="stage-ring-head" cx="43.1" cy="65.2" r="2.1" fill="#fff" opacity="0.95" />
+
+      <defs>
+        {/* The sweep fades from nothing to solid along its own length, so the
+            arc reads as a trail behind the head rather than as a floating bar
+            with two identical ends. */}
+        <linearGradient id="stageSweep" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
+        </linearGradient>
+      </defs>
     </svg>
   )
 }

@@ -9,7 +9,7 @@
 //! security control: the app is open source, so anyone can remove the check.
 //! Say so in the UI and the README; never present it as protection.
 
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::Path;

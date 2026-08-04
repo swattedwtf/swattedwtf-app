@@ -72,6 +72,16 @@ body {
   user-select: none;
 }
 
+/* The one exception. A frameless app should not let you drag-select its chrome,
+   but an input the inherited `user-select: none` has made unselectable cannot be
+   double-clicked, dragged over, or corrected without deleting back to the
+   mistake, which is a real problem in the quick-lookup bar where the whole point
+   is pasting over what is already there. */
+input,
+textarea {
+  user-select: text;
+}
+
 /* ---- Panel material ----------------------------------------------------
    The web's layered panel, not a flat fill inside a uniform 1px border. A
    uniform border is a single grey that disappears wherever the artwork behind
@@ -407,54 +417,6 @@ textarea:focus-visible {
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 
-/* Boot stage: the sweeping ring and its shimmering label. */
-@keyframes bootspin { to { transform: rotate(360deg); } }
-@keyframes shimmer { to { background-position: -220% 0; } }
-
-.shimmer-label {
-  background: linear-gradient(90deg, rgba(255,255,255,0.45) 0%, #fff 45%, rgba(255,255,255,0.45) 90%);
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: shimmer 2.2s linear infinite;
-}
-
-/* ---- Reveal sequence (boot) --------------------------------------------
-   The wordmark resolves out of a blur while scaling down, a hairline draws
-   underneath it, then the welcome line rises. Timings are staggered by
-   animation-delay rather than chained in JS so the whole sequence is
-   declarative and cannot drift out of sync with the state machine. */
-@keyframes markIn { to { opacity: 1; filter: blur(0); transform: scale(1); } }
-@keyframes ruleIn { to { width: 150px; } }
-@keyframes softUp { to { opacity: 1; transform: translateY(0); } }
-
-.mark-in {
-  opacity: 0;
-  filter: blur(14px);
-  transform: scale(1.09);
-  animation: markIn 1.1s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
-}
-
-.rule-in {
-  height: 1px;
-  width: 0;
-  background: rgba(255, 255, 255, 0.18);
-  animation: ruleIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1.15s forwards;
-}
-
-.welcome-in {
-  opacity: 0;
-  transform: translateY(8px);
-  animation: softUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 1.65s forwards;
-}
-
-.hint-in {
-  opacity: 0;
-  transform: translateY(8px);
-  animation: softUp 0.7s ease 2.2s forwards;
-}
-
 /* ---- Scrollbars ---------------------------------------------------------
    Hidden everywhere, but scrolling still works: wheel, trackpad, keyboard and
    drag-to-scroll are untouched, only the visual track is gone. A frameless
@@ -519,6 +481,55 @@ textarea:focus-visible {
     linear-gradient(180deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.45));
 }
 
+/* ---- Pre-shell surface --------------------------------------------------
+   Every screen before the dashboard (boot, login, register, 2FA, the code
+   reveal, offline, tampered, update ready) used a flat #0b0b0b fill, so the app
+   opened on a dead black rectangle and only acquired any material once you were
+   signed in. The web opens on artwork, and the difference made the first thirty
+   seconds of the desktop client read as a different, cheaper product.
+
+   This is the dashboard's stack (artwork, wash, grain) pushed much further down
+   so it never competes with the one or two things these screens are actually
+   asking you to read. Three background layers in one pseudo-element rather than
+   three elements, so a screen only has to add one class.
+
+   The direct-children rule is required, not defensive: the pseudo-elements are
+   positioned, so without it they paint over the content. */
+.boot-surface {
+  position: relative;
+  background: #060606;
+}
+
+.boot-surface::before,
+.boot-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.boot-surface::before {
+  background-image:
+    radial-gradient(ellipse 90% 75% at 50% 45%, rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)),
+    url("/bg/background-auth.webp");
+  background-size: auto, auto, cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.boot-surface::after {
+  background-image: url("/bg/texture.png");
+  background-size: 180px;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+}
+
+.boot-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* ---- Motion -------------------------------------------------------------
    A short rise-and-fade on screen changes. Long enough to register as motion,
    short enough that it never delays the click. */
@@ -531,56 +542,21 @@ textarea:focus-visible {
   animation: screenIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Respect a stated preference for less motion, without gutting the app.
-   The blanket "duration: 0.01ms on everything" this replaces was too broad:
-   Windows ships with "Animation effects" off for a lot of people, so the boot
-   reveal simply vanished for them and the app read as broken rather than as
-   calm. Entrances still play, just quickly, so content is never missing, while
-   the genuinely motion-heavy things (the infinite spinner, the blur-and-scale
-   reveal, parallax) stop. */
-@media (prefers-reduced-motion: reduce) {
-  .mark-in,
-  .welcome-in,
-  .hint-in,
-  .boot-mark,
-  .boot-label,
-  .screen-in,
-  .quick-root {
-    animation-duration: 0.12s !important;
-    animation-delay: 0s !important;
-  }
-
-  /* No blur-and-scale: that is the part that actually provokes discomfort. */
-  .mark-in {
-    filter: none !important;
-    transform: none !important;
-  }
-
-  /* Looping motion stops entirely. */
-  .ring-arc,
-  .ring-arc-slow,
-  .shimmer-label {
-    animation: none !important;
-  }
-
-  /* The ring still has to read as "working", so keep a non-moving cue. */
-  .shimmer-label {
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .rule-in {
-    animation-duration: 0.12s !important;
-    animation-delay: 0s !important;
-  }
-
-  /* The stat fills land at their value immediately, all four together. */
-  .stat-fill {
-    animation-duration: 0.12s !important;
-    animation-delay: 0s !important;
-  }
-
-  .stat-card { transition: none !important; }
-}
+/* There is deliberately no prefers-reduced-motion block.
+ *
+ * Two versions of one have shipped and both were wrong on the platform this app
+ * is actually used on. Windows reports reduced motion when "Animation effects"
+ * is off in Settings > Accessibility > Visual effects, which is off for a very
+ * large number of people and which almost none of them set as a motion
+ * sensitivity preference. Under the first version (a blanket 0.01ms) the entire
+ * boot reveal vanished; under the second the loading ring did not spin, which is
+ * how a piece of software says "I am working" and reads as a freeze when it is
+ * missing.
+ *
+ * What is left here is short entrances, one five-second boot per launch, and one
+ * loading spinner. No parallax, no long autoplaying loops, nothing that tracks
+ * the pointer or the scroll. That is the mild end of what the preference exists
+ * to suppress, so it runs for everyone. */
 
 /* ---- Window shape -------------------------------------------------------
    A borderless window cannot be rounded by DWM (there is no frame to round),
@@ -606,57 +582,156 @@ textarea:focus-visible {
   box-shadow: none;
 }
 
-/* ---- Boot stage entrance ------------------------------------------------
-   The mark settles first, the label follows. Keyed on the label text in the
-   component, so each stage change replays this rather than swapping characters
-   in place, which reads as a glitch at these sizes. */
-.boot-mark {
-  opacity: 0;
-  transform: translateY(-6px);
-  animation: softUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
-}
-
-.boot-label {
-  opacity: 0;
-  transform: translateY(6px);
-  animation: softUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
-}
-
-/* ---- Ring ---------------------------------------------------------------
-   A second, slower counter-rotating arc under the primary sweep gives the
-   spinner some parallax instead of one flat rotation. */
-.ring-track { stroke: rgba(255, 255, 255, 0.09); }
-
-.ring-arc {
-  transform-origin: 50% 50%;
-  animation: bootspin 1.15s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
-}
-
-.ring-arc-slow {
-  transform-origin: 50% 50%;
-  animation: bootspinReverse 2.6s linear infinite;
-}
-
-@keyframes bootspinReverse { to { transform: rotate(-360deg); } }
-
 /* ---- Quick-lookup overlay ----------------------------------------------
-   A floating bar summoned over other applications, so it reads as a system
-   utility rather than a window: heavy blur, a bright rim so it separates from
-   whatever is behind it, and its own rounded shape (the window under it is
-   transparent). */
+   A floating bar summoned over whatever else is on screen, so it has to read as
+   a system utility rather than as a second window of ours: heavier blur than a
+   panel, a brighter rim so it separates from an unknown backdrop, and the same
+   gradient-hairline frame the dashboard's panels use so it is recognisably the
+   same product.
+
+   The radius here is matched by the window's own clip region (QUICK_RADIUS in
+   window_chrome.rs). Change one and change the other, or the overlay gets a
+   sliver of square corner outside its curve. */
 .quick-root {
   height: 100%;
-  border-radius: 14px;
-  background: rgba(12, 12, 12, 0.82);
-  backdrop-filter: blur(28px) saturate(1.6);
+  padding: 1px;
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.07) 40%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  box-shadow: 0 32px 80px -24px rgba(0, 0, 0, 0.95);
+}
+
+.quick-body {
+  position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(19, 19, 19, 0.9), rgba(9, 9, 9, 0.93));
+  backdrop-filter: blur(30px) saturate(1.7) brightness(1.04);
+}
+
+/* Specular highlight along the top edge, inset from the corners so it reads as
+   light catching a bevel rather than as a second border. */
+.quick-body::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+}
+
+.quick-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url("/bg/texture.png") 0 0 / 180px;
+  opacity: 0.05;
+  mix-blend-mode: soft-light;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .quick-body { background: linear-gradient(180deg, #131313, #090909); }
+}
+
+/* The leading glyph tile. Same shape language as the sidebar's icon wells. */
+.quick-glyph {
+  display: flex;
+  height: 38px;
+  width: 38px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.05);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
-    0 24px 60px -12px rgba(0, 0, 0, 0.85);
-  animation: quickIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  transition: color 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Brightens once the text in the field is something we can actually act on, so
+   the overlay answers before you press Enter. */
+.quick-root[data-armed="true"] .quick-glyph {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.quick-input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: #fff;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.quick-input::placeholder {
+  color: rgba(255, 255, 255, 0.26);
+}
+
+/* The detected identifier type. Appears only once there is one. */
+.quick-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  animation: quickPill 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes quickPill {
+  from { opacity: 0; transform: translateX(6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Real keycaps rather than the words "enter" and "esc" in grey, which is what
+   every polished launcher on either platform does and what the previous
+   version of this bar did not. */
+.kbd {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.11),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+    0 1px 0 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Entrance. Replayed on every show rather than only on mount: the window is
+   created hidden at startup and then only shown and hidden, so a mount-time
+   animation played exactly once, invisibly, before the user ever pressed the
+   hotkey. QuickLookup remounts this element with a new key on each show. */
+.quick-enter {
+  animation: quickIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes quickIn {
-  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  from { opacity: 0; transform: scale(0.96) translateY(-8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }

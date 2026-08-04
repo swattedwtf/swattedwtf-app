@@ -7,7 +7,7 @@
  */
 export function OfflineScreen({ error, onRetry }: { error: string | null; onRetry: () => void }) {
   return (
-    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-5 boot-surface px-10">
       <h1 className="text-lg font-semibold tracking-tight">Can't reach swatted.wtf</h1>
 
       <p className="max-w-[380px] text-center text-xs leading-relaxed text-[var(--color-muted-foreground)]">

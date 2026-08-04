@@ -3,12 +3,28 @@
  * Lives here rather than in theme.css so the sequence's timing can be reasoned
  * about in one place, next to the component that drives it.
  *
- * The whole point of this file is continuity. The sequence used to be three
- * separate components that hard-swapped: the ring cut out the instant the phase
- * changed, and the wordmark did not begin fading in for another 250ms, so the
- * signature moment of the product opened with a quarter second of empty black.
- * Here the mark is ONE element that never unmounts. It scales up as the ring
- * retires, so verify, update and reveal read as a single gesture.
+ * Two things shape this file.
+ *
+ * CONTINUITY. The sequence used to be three separate components that
+ * hard-swapped: the ring cut out the instant the phase changed, and the
+ * wordmark did not begin fading in for another 250ms, so the signature moment
+ * of the product opened with a quarter second of empty black. Here the mark is
+ * ONE element that never unmounts. It scales up as the ring retires, so verify,
+ * update and reveal read as a single gesture.
+ *
+ * MATERIAL. The boot used to be flat black with a faint radial. The web opens
+ * on artwork, and landing on a dead black rectangle first made the app read as
+ * a different, cheaper product. The same three layers the dashboard uses are
+ * here (artwork, grain, wash), just pushed much further down so the mark still
+ * owns the screen.
+ *
+ * There is deliberately NO prefers-reduced-motion block in this file. Windows
+ * ships with "Animation effects" off for a very large number of people, and
+ * that preference is reported to the webview as reduced motion: the previous
+ * rule here meant the spinner did not spin and the welcome did not animate on
+ * exactly the machines the app is built for. The boot is a five-second,
+ * one-per-launch, non-parallax sequence, which is the mild end of what the
+ * preference is meant to suppress.
  */
 
 .stage {
@@ -16,8 +32,8 @@
   position: relative;
   height: 100%;
   overflow: hidden;
-  background: #0b0b0b;
-  transition: opacity 220ms cubic-bezier(0.4, 0, 1, 1);
+  background: #060606;
+  transition: opacity 260ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* Fades just before handing over to the shell, so the dashboard does not
@@ -26,23 +42,61 @@
   opacity: 0;
 }
 
-/* A pool of light so the black has depth. The middle stop sits wide and the
-   grain sits on top: a two-stop radial over near-black bands visibly at 8-bit,
-   and the texture breaks the rings up. */
+/* The artwork and its wash, in two elements rather than the one pseudo-element
+   .boot-surface uses in theme.css. Same values deliberately: the boot hands
+   straight over to the login screen, and when the two were mixed by eye the
+   handover was a visible step change in brightness. If one set moves, move both.
+   (They cannot simply share the class: .boot-surface positions its direct
+   children so its pseudo-elements stay behind them, which would knock the
+   stage's own absolutely-positioned layers back into the flow.) */
+.stage-art {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("/bg/background-auth.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+.stage-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90% 75% at 50% 45%, rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5));
+}
+
+/* A pool of light behind the mark, breathing slowly. The middle stop sits wide
+   and the grain sits on top: a two-stop radial over near-black bands visibly at
+   8-bit, and the texture breaks the rings up. */
 .stage-glow {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 460px;
-  height: 460px;
+  width: 520px;
+  height: 520px;
   transform: translate(-50%, -50%);
   pointer-events: none;
   background: radial-gradient(
     circle,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(255, 255, 255, 0.022) 52%,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.025) 52%,
     transparent 72%
   );
+  animation: stageGlow 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes stageGlow {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
 }
 
 .stage-grain {
@@ -51,8 +105,17 @@
   pointer-events: none;
   background-image: url("/bg/texture.png");
   background-size: 180px;
-  opacity: 0.06;
+  opacity: 0.07;
   mix-blend-mode: overlay;
+}
+
+/* A hairline vignette on the inside of the window's own curve, so the boot has
+   a defined edge rather than bleeding into the desktop. */
+.stage-edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 80px 0 rgba(0, 0, 0, 0.75);
 }
 
 .stage-inner {
@@ -68,24 +131,30 @@
    One element for the entire sequence. Scale rather than font-size so the
    browser can composite it on the GPU instead of relaying out text. */
 .stage-mark {
+  position: relative;
   font-size: 19px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
   color: var(--mark-fg);
   transform: scale(var(--mark-scale));
   transform-origin: center;
   transition: transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
-  animation: stageMarkIn 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: stageMarkIn 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Lifts the wordmark off the artwork behind it without adding a second
+     colour to a strictly black-and-white palette. */
+  text-shadow: 0 0 26px rgba(255, 255, 255, 0.18);
 }
 
 @keyframes stageMarkIn {
   from {
     opacity: 0;
+    filter: blur(6px);
     transform: scale(calc(var(--mark-scale) * 0.94));
   }
   to {
     opacity: 1;
+    filter: blur(0);
     transform: scale(var(--mark-scale));
   }
 }
@@ -100,12 +169,13 @@
    revolution, which reads as a stutter rather than as motion. Indeterminate
    spinners ease the dash, never the rotation. */
 .stage-ring {
+  position: relative;
   height: 66px;
-  margin-top: 34px;
+  margin-top: 36px;
   overflow: hidden;
   transition:
-    opacity 200ms cubic-bezier(0.4, 0, 1, 1),
-    transform 200ms cubic-bezier(0.4, 0, 1, 1),
+    opacity 220ms cubic-bezier(0.4, 0, 1, 1),
+    transform 220ms cubic-bezier(0.4, 0, 1, 1),
     height 420ms cubic-bezier(0.16, 1, 0.3, 1),
     margin-top 420ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -127,7 +197,13 @@
 
 .stage-ring-arc-inner {
   transform-origin: 50% 50%;
-  animation: stageSpinBack 2.4s linear infinite;
+  animation: stageSpinBack 2.6s linear infinite;
+}
+
+/* The leading tip of the sweep, bright enough to read as a light source. */
+.stage-ring-head {
+  transform-origin: 50% 50%;
+  animation: stageSpin 1.05s linear infinite;
 }
 
 @keyframes stageSpin {
@@ -144,25 +220,42 @@
 
 /* ---- Labels and the reveal --------------------------------------------- */
 .stage-label {
-  margin-top: 26px;
-  font-size: 12px;
+  margin-top: 28px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: rgba(255, 255, 255, 0.55);
-  /* Breathes rather than sweeping a gradient: the old shimmer wrapped its
-     background position and the seam was visible on every loop. */
-  animation: stageBreathe 1.9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  letter-spacing: 0.2em;
+  /* Keyed on its own text in the component, so each stage change replays this
+     entrance rather than swapping characters in place, which reads as a glitch
+     at this size. */
+  animation:
+    stageLabelIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    stageBreathe 2.2s cubic-bezier(0.45, 0, 0.55, 1) 420ms infinite;
   transition: opacity 180ms cubic-bezier(0.4, 0, 1, 1);
 }
 
+@keyframes stageLabelIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    letter-spacing: 0.32em;
+  }
+  to {
+    opacity: 0.55;
+    transform: translateY(0);
+    letter-spacing: 0.2em;
+  }
+}
+
+/* Breathes rather than sweeping a gradient: the old shimmer wrapped its
+   background position and the seam was visible on every loop. */
 @keyframes stageBreathe {
   0%,
   100% {
-    opacity: 0.55;
+    color: rgba(255, 255, 255, 0.5);
   }
   50% {
-    opacity: 1;
+    color: rgba(255, 255, 255, 0.92);
   }
 }
 
@@ -174,28 +267,28 @@
 /* The rule and the welcome only exist in the reveal, so they animate in from
    nothing. Delays are measured from the moment the mark starts growing. */
 .stage-rule {
-  margin-top: 18px;
+  margin-top: 20px;
   height: 1px;
   width: 0;
   /* Fades into the black at both ends instead of stopping dead. */
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.28) 20%,
-    rgba(255, 255, 255, 0.28) 80%,
+    rgba(255, 255, 255, 0.3) 20%,
+    rgba(255, 255, 255, 0.3) 80%,
     transparent
   );
-  animation: stageRule 620ms cubic-bezier(0.16, 1, 0.3, 1) 300ms forwards;
+  animation: stageRule 680ms cubic-bezier(0.16, 1, 0.3, 1) 300ms forwards;
 }
 
 @keyframes stageRule {
   to {
-    width: 168px;
+    width: 176px;
   }
 }
 
 .stage-welcome {
-  margin-top: 20px;
+  margin-top: 22px;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.5);
   opacity: 0;
@@ -216,31 +309,5 @@
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-/* Reduced motion: the sequence still happens, it just stops moving. Content is
-   never missing, which is what the previous blanket rule got wrong. */
-@media (prefers-reduced-motion: reduce) {
-  .stage-mark,
-  .stage-rule,
-  .stage-welcome,
-  .stage-hint {
-    animation-duration: 0.12s !important;
-    animation-delay: 0s !important;
-  }
-
-  .stage-mark {
-    transition: none;
-  }
-
-  .stage-ring-arc,
-  .stage-ring-arc-inner,
-  .stage-label {
-    animation: none !important;
-  }
-
-  .stage-label {
-    opacity: 0.85;
   }
 }

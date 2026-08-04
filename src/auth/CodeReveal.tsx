@@ -56,7 +56,7 @@ export function CodeReveal({ code, onContinue }: { code: string; onContinue: () 
   }
 
   return (
-    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-6 bg-[#0b0b0b] px-10">
+    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-6 boot-surface px-10">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
         Your login code
       </p>
