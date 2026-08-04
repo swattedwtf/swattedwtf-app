@@ -13,6 +13,16 @@ export type InputField = {
   name: string
   label: string
   placeholder: string
+  /**
+   * True when a blank value is a legitimate answer.
+   *
+   * Most fields are the query itself, where blank can only ever be a wasted
+   * metered request. But the Roblox scraper's filters are genuinely optional
+   * server-side, and a registry-wide test that demanded every field reject
+   * blank forced them to become required, which is worse UX invented by a
+   * test rather than by the product.
+   */
+  optional?: boolean
   validate(v: string): string | null
 }
 

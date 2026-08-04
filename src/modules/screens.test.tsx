@@ -51,9 +51,14 @@ describe("every registered module renders defensively", () => {
       for (const f of m.inputs) {
         expect(f.name).toBeTruthy()
         expect(f.label).toBeTruthy()
-        // A blank value is never acceptable: it would become a metered request
-        // for nothing.
-        expect(f.validate("")).toBeTruthy()
+        if (f.optional) {
+          // Blank is a legitimate answer for these, so demanding a message
+          // would force an optional filter to behave like a required one.
+          expect(f.validate(""), `${f.name} is optional and must accept blank`).toBeNull()
+        } else {
+          // Otherwise blank can only ever become a metered request for nothing.
+          expect(f.validate(""), `${f.name} must reject blank`).toBeTruthy()
+        }
       }
     })
 
