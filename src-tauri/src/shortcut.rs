@@ -29,7 +29,7 @@
 use serde::Serialize;
 use std::str::FromStr;
 use tauri::AppHandle;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use crate::settings::SettingsState;
 
@@ -73,14 +73,62 @@ pub fn validate(input: &str) -> Result<Shortcut, String> {
         format!("\"{combo}\" is not a combination this app can bind. Try a letter, a number or a function key with a modifier.")
     })?;
 
-    // Our rule, not the parser's. See the note at the top of the file.
-    if parsed.mods.is_empty() {
+    // Our rules, not the parser's. See the note at the top of the file.
+    //
+    // Shift alone does NOT count. The parser treats it as a modifier, so an
+    // earlier version of this check accepted `Shift+KeyE` and the app then took
+    // uppercase E away from every other application on the machine, persisted
+    // it, and re-grabbed it at every launch. The user's only way out was to find
+    // this screen again with a keyboard missing a letter, or to delete
+    // settings.json. A system-wide grab needs a modifier people do not hold down
+    // while typing.
+    const REAL: Modifiers = Modifiers::CONTROL.union(Modifiers::ALT).union(Modifiers::SUPER);
+    if !parsed.mods.intersects(REAL) {
         return Err(format!(
-            "{combo} has no modifier key. A shortcut this app grabs system-wide needs Ctrl, Alt, Shift or Cmd with it, or it would stop that key working everywhere else."
+            "{combo} needs a modifier that is not used for typing: Ctrl, Alt or Cmd. Shift on its own is not enough, because this app takes the combination away from every other application, and Shift with a letter is how you type a capital."
+        ));
+    }
+
+    // Combinations the operating system and every editor rely on. Grabbing one
+    // of these system-wide breaks copy, paste or closing a window everywhere,
+    // which is a worse outcome than refusing the shortcut.
+    if is_reserved(&parsed) {
+        return Err(format!(
+            "{combo} is used by almost every application for something else. Pick a combination that is not copy, paste, undo, save or close."
         ));
     }
 
     Ok(parsed)
+}
+
+/// Combinations we refuse to take from the rest of the system.
+///
+/// Deliberately short. This is not an attempt to enumerate every shortcut any
+/// application uses, which is impossible; it is the handful whose loss would
+/// look like the computer is broken rather than like this app has a hotkey.
+fn is_reserved(shortcut: &Shortcut) -> bool {
+    use Code::*;
+
+    let ctrl_or_cmd = shortcut.mods.intersects(Modifiers::CONTROL.union(Modifiers::SUPER));
+    let plain = shortcut.mods.intersects(Modifiers::SHIFT.union(Modifiers::ALT));
+
+    if ctrl_or_cmd && !plain {
+        // Copy, paste, cut, undo, redo, select all, save, find, print, new,
+        // close and quit.
+        if matches!(
+            shortcut.key,
+            KeyC | KeyV | KeyX | KeyZ | KeyY | KeyA | KeyS | KeyF | KeyP | KeyN | KeyW | KeyQ
+        ) {
+            return true;
+        }
+    }
+
+    // Alt+F4 closes a window on Windows; Alt+Tab switches them.
+    if shortcut.mods.contains(Modifiers::ALT) && matches!(shortcut.key, F4 | Tab) {
+        return true;
+    }
+
+    false
 }
 
 /// The two operating-system calls, behind a trait.
@@ -246,6 +294,41 @@ mod tests {
         assert!(validate("KeyK").is_err());
         assert!(validate("Space").is_err());
         assert!(validate("Escape").is_err());
+    }
+
+    /// Shift is a modifier to the parser but not to us.
+    ///
+    /// An earlier version of this check used `mods.is_empty()`, which accepted
+    /// `Shift+KeyE` and then took uppercase E away from the whole machine,
+    /// persisted it, and re-grabbed it at every launch. The user's way out was
+    /// to find this screen again with a keyboard missing a letter.
+    #[test]
+    fn shift_alone_is_not_a_modifier_for_our_purposes() {
+        for combo in ["Shift+KeyE", "Shift+KeyA", "Shift+Digit1", "Shift+Space"] {
+            let err = validate(combo).expect_err("shift-only must be rejected");
+            assert!(err.contains("modifier"), "the copy should say why: {err}");
+        }
+
+        // A real modifier alongside Shift is fine.
+        assert!(validate("Control+Shift+KeyE").is_ok());
+        assert!(validate("Alt+Shift+KeyE").is_ok());
+    }
+
+    /// Combinations whose loss would look like the computer is broken.
+    #[test]
+    fn refuses_the_combos_every_application_relies_on() {
+        for combo in [
+            "Control+KeyC", "Control+KeyV", "Control+KeyX", "Control+KeyZ",
+            "Control+KeyA", "Control+KeyS", "Control+KeyW", "Control+KeyQ",
+            "Super+KeyC", "Super+KeyV", "Alt+F4", "Alt+Tab",
+        ] {
+            assert!(validate(combo).is_err(), "{combo} must be refused");
+        }
+
+        // Adding a second modifier makes them ordinary again: Ctrl+Shift+C is
+        // not the copy shortcut, and refusing it would be over-reach.
+        assert!(validate("Control+Shift+KeyC").is_ok());
+        assert!(validate("Control+Alt+KeyS").is_ok());
     }
 
     /// Confirms the premise of the rule above: the parser itself is happy with
