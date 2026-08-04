@@ -230,7 +230,7 @@ function OpenButton({ label, url }: { label: string; url: string | null }) {
 // User Info, Phone to User and Email to User
 // ---------------------------------------------------------------------------
 
-export function Result({ data, partial }: ResultProps) {
+export function Result({ data }: ResultProps) {
   // Coerced once, here. A renderer that reads `data.videos.length` on an absent
   // field throws inside React's render, which in this app is a white window with
   // no console the user can reach.
@@ -292,11 +292,6 @@ export function Result({ data, partial }: ResultProps) {
     return (
       <div className="space-y-4">
         <EmptyState message={message} />
-        {partial.length > 0 && (
-          <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-            Some sources did not answer: {partial.join(", ")}.
-          </p>
-        )}
       </div>
     )
   }
@@ -446,11 +441,6 @@ export function Result({ data, partial }: ResultProps) {
         )}
       </Section>
 
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sources did not answer: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }
@@ -459,7 +449,7 @@ export function Result({ data, partial }: ResultProps) {
 // Share resolver
 // ---------------------------------------------------------------------------
 
-export function ShareResult({ data, partial }: ResultProps) {
+export function ShareResult({ data }: ResultProps) {
   const raw = withDefaults(data, {} as Partial<TikTokShareData>)
   const share = withDefaults(raw.share, EMPTY_SHARE)
   const d: TikTokShareData = {
@@ -473,11 +463,6 @@ export function ShareResult({ data, partial }: ResultProps) {
     return (
       <div className="space-y-4">
         <EmptyState message="That share link did not resolve to a TikTok user or video." />
-        {partial.length > 0 && (
-          <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-            Some sources did not answer: {partial.join(", ")}.
-          </p>
-        )}
       </div>
     )
   }
@@ -518,11 +503,6 @@ export function ShareResult({ data, partial }: ResultProps) {
         ) : null}
       </Section>
 
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sources did not answer: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }

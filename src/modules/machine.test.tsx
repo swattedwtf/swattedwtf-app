@@ -71,9 +71,13 @@ describe("Machine result", () => {
     expect(() => render({})).not.toThrow()
   })
 
-  it("names the sources that did not answer", () => {
-    const html = render(full, ["machine"])
-    expect(html).toContain("Some sources did not answer: machine.")
+  it("leaves naming the failed sources to ResultView, which renders it once", () => {
+    // Two lists meaning "this section is missing", in two vocabularies, was the
+    // same fact told twice. ResultView owns the single rendering, so a module
+    // that adds its own is the bug.
+    const html = render(full, ["oath", "messages"])
+    expect(html).not.toContain("Some sources did not answer")
+    expect(html).not.toContain("Some sections did not load")
   })
 
   it("uses no em dashes in its own copy", () => {

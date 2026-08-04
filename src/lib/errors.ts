@@ -106,7 +106,7 @@ export function isNetworkFailure(err: unknown): boolean {
  * - `suspended` account-suspended panel, not an error toast and not a Retry
  * - `legal`     a link to accept the updated terms
  * - `retry`     inline "try again" with a Retry button
- * - `auth`      nothing to show: the app is already returning to login
+ * - `auth`      the session is dead and the screen says so; nothing here clears it
  * - `error`     inline error with a Retry
  */
 export type ErrorKind = "upgrade" | "suspended" | "legal" | "retry" | "auth" | "error"

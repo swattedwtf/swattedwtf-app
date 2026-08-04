@@ -43,7 +43,7 @@ const QUERY_TYPE_LABEL: Record<string, string> = {
   ip: "IP address",
 }
 
-export function Result({ data, partial }: ResultProps) {
+export function Result({ data }: ResultProps) {
   const raw = withDefaults(data, {} as Partial<MinecraftData>)
   const d: MinecraftData = {
     ...(raw as MinecraftData),
@@ -181,11 +181,6 @@ export function Result({ data, partial }: ResultProps) {
         )}
       </Section>
 
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sources did not answer: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }

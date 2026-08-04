@@ -73,7 +73,7 @@ const EMPTY_SC_PROFILE: SnapchatData["profile"] = {
   website: null,
 }
 
-export function Result({ data, partial }: ResultProps) {
+export function Result({ data }: ResultProps) {
   const raw = withDefaults(data, {} as Partial<SnapchatData>)
   const p = withDefaults(raw.profile, EMPTY_SC_PROFILE)
   const d: SnapchatData = {
@@ -94,11 +94,6 @@ export function Result({ data, partial }: ResultProps) {
               : "No Snapchat account found for that query.")
           }
         />
-        {partial.length > 0 && (
-          <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-            Some sources did not answer: {partial.join(", ")}.
-          </p>
-        )}
       </div>
     )
   }
@@ -169,11 +164,6 @@ export function Result({ data, partial }: ResultProps) {
         )}
       </Section>
 
-      {partial.length > 0 && (
-        <p className="px-1 text-[11px] text-[var(--color-muted-foreground)]">
-          Some sources did not answer: {partial.join(", ")}.
-        </p>
-      )}
     </div>
   )
 }
