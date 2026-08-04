@@ -108,13 +108,23 @@ textarea {
   position: relative;
   border: 0;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(21, 21, 21, 0.72), rgba(11, 11, 11, 0.78));
+  /* A LIGHT, highly translucent fill. This used to be rgba(21,21,21,0.72), an
+     almost-opaque dark slab with a little blur behind it, which is a dark card
+     and not glass at all: nothing of the backdrop survived it. Glass works the
+     other way round, a bright thin film that the thing behind it shows through,
+     with the blur and the saturation doing the work. */
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.045) 45%,
+    rgba(255, 255, 255, 0.025) 100%
+  );
   backdrop-filter: var(--glass-filter);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
-    0 28px 70px -40px rgba(0, 0, 0, 0.95),
-    0 2px 8px -4px rgba(0, 0, 0, 0.6);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -30px rgba(0, 0, 0, 0.85);
 }
 
 /* Two-element form: the outer element becomes the gradient frame only. Its own
@@ -138,7 +148,12 @@ textarea {
   position: relative;
   overflow: hidden;
   border-radius: 15px;
-  background: linear-gradient(180deg, rgba(21, 21, 21, 0.72), rgba(11, 11, 11, 0.78));
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.085) 0%,
+    rgba(255, 255, 255, 0.04) 45%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
   backdrop-filter: var(--glass-filter);
   padding: 20px;
 }
@@ -168,9 +183,13 @@ textarea {
 }
 
 /* WebKitGTK on some distros lacks backdrop-filter; fall back to a flat card. */
+/* Without backdrop-filter a translucent fill shows the raw artwork through the
+   text, so the fallback goes solid. Legibility beats the effect. */
 @supports not (backdrop-filter: blur(1px)) {
-  .glass { background: linear-gradient(180deg, #151515, #0b0b0b); }
-  .glass > .glass-body { background: linear-gradient(180deg, #151515, #0b0b0b); }
+  .glass { background: linear-gradient(180deg, #1a1a1a, #101010); }
+  .glass > .glass-body { background: linear-gradient(180deg, #1a1a1a, #101010); }
+  .glass-tile { background: #191919; }
+  .glass-input { background: #121212; }
 }
 
 /* A sub-surface: tiles, chips, wells and empty states inside a .glass panel.
@@ -202,6 +221,24 @@ textarea {
     inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
     inset 0 0 0 1px rgba(255, 255, 255, 0.11),
     0 10px 28px -18px rgba(0, 0, 0, 0.9);
+}
+
+/* The sidebar. A full-height pane rather than a card, so it gets its own rule:
+   the same film, a touch denser because content scrolls behind nothing and the
+   nav has to stay readable over whatever the artwork is doing, plus a hairline
+   on the inner edge instead of a plain border. */
+.glass-rail {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.035) 100%
+  );
+  backdrop-filter: blur(30px) saturate(2) brightness(1.04);
+  box-shadow: inset -1px 0 0 0 rgba(255, 255, 255, 0.10);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-rail { background: #141414; }
 }
 
 /* Text fields, on the same material. A flat dark rectangle inside a glass panel
@@ -525,7 +562,7 @@ textarea:focus-visible {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 0.85;
+  opacity: 1;
 }
 
 .app-backdrop::after {
@@ -540,12 +577,16 @@ textarea:focus-visible {
    previous one fell off to nothing well before the right edge, leaving the
    right third of the shell undarkened, and the panels there lost their frames
    against it entirely. A flat linear underneath guarantees a floor. */
+/* Lifted deliberately. At 0.70 in the middle this blacked the artwork out, and
+   glass with nothing behind it is just a grey card: the panels had nothing to
+   refract, which is why they read as flat however translucent the fill became.
+   Enough wash remains that dense text stays legible over the bright diagonal. */
 .app-backdrop-wash {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 120% 100% at 30% 25%, rgba(0, 0, 0, 0.70), rgba(0, 0, 0, 0.52) 60%, rgba(0, 0, 0, 0.42) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.45));
+    radial-gradient(ellipse 120% 100% at 30% 25%, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.30) 60%, rgba(0, 0, 0, 0.22) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.28));
 }
 
 /* ---- Pre-shell surface --------------------------------------------------

@@ -84,7 +84,7 @@ export function Home({ overview }: { overview: Overview }) {
           </div>
 
           <div className="flex flex-col items-center px-6 py-8 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5">
+            <span className="glass-tile grid h-12 w-12 place-items-center rounded-2xl">
               <Receipt className="h-5 w-5 text-[var(--muted-foreground)]" aria-hidden="true" />
             </span>
             <h3 className="mt-4 text-sm font-semibold tracking-tight">No Active Orders</h3>

@@ -76,7 +76,7 @@ export function Sidebar({
   }, [])
 
   return (
-    <nav className="relative z-10 flex h-full w-[224px] shrink-0 flex-col overflow-hidden border-r border-white/[0.07] bg-black/40 backdrop-blur-xl">
+    <nav className="glass-rail relative z-10 flex h-full w-[224px] shrink-0 flex-col overflow-hidden">
       <div
         data-tauri-drag-region
         className="drag shrink-0 border-b border-white/[0.06] px-4 pb-3.5 pt-4 text-[15px] font-semibold tracking-[-0.01em]"

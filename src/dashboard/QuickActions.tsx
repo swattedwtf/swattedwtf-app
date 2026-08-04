@@ -75,7 +75,7 @@ export function QuickActions() {
               type="button"
               onClick={() => void open(a.url)}
               title={`Opens ${a.url} in your browser`}
-              className="group relative flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-3.5 text-center transition-colors hover:border-white/20 hover:bg-white/[0.05]"
+              className="glass-tile glass-tile-hover group relative flex flex-col items-center justify-center gap-1.5 px-2 py-3.5 text-center"
             >
               <ExternalLink
                 className="absolute right-1.5 top-1.5 h-3 w-3 text-[var(--muted-foreground)] opacity-60 transition-opacity group-hover:opacity-100"
