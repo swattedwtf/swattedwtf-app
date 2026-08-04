@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { MODULES, enabledRoutes, moduleForRoute } from "./registry"
+import { BUILT_IN_ROUTES, MODULES, enabledRoutes, moduleForRoute } from "./registry"
 import type { ModuleDescriptor } from "./types"
 import { NAV, flattenNav, isEnabled } from "../shell/nav"
 
@@ -13,7 +13,7 @@ describe("registry and nav stay in sync", () => {
   it("every enabled route is either a built-in screen or a module", () => {
     const ids = new Set(MODULES.map((m) => m.route))
     for (const r of enabledRoutes()) {
-      expect(r === "/dashboard" || r === "/settings" || ids.has(r)).toBe(true)
+      expect(BUILT_IN_ROUTES.includes(r) || ids.has(r)).toBe(true)
     }
   })
 
@@ -24,7 +24,9 @@ describe("registry and nav stay in sync", () => {
 
   it("enables exactly the routes the registry carries, so a soon pill cannot drift", () => {
     for (const m of MODULES) expect(isEnabled(m.route)).toBe(true)
-    expect(enabledRoutes().length).toBe(MODULES.length + 2)
+    // Derived, not a magic number: adding a built-in screen should not need
+    // this line edited to keep passing.
+    expect(enabledRoutes().length).toBe(MODULES.length + BUILT_IN_ROUTES.length)
   })
 
   it("never lets a nav group header be enabled by one of its children", () => {
@@ -57,8 +59,7 @@ describe("a registered module", () => {
           // Not a built-in either: /dashboard and /settings are enabled without
           // a descriptor, so picking one would make the "starts disabled"
           // precondition false before the stub was ever pushed.
-          h !== "/dashboard" &&
-          h !== "/settings" &&
+          !BUILT_IN_ROUTES.includes(h) &&
           !MODULES.some((m) => m.route === h),
       ) ?? "/unbuilt"
 

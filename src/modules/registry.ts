@@ -1,5 +1,6 @@
 import { descriptor as discord } from "./discord"
 import { descriptor as instagram, shareDescriptor as instagramShare } from "./instagram"
+import { descriptor as machine } from "./machine"
 import { descriptor as minecraft } from "./minecraft"
 import { descriptor as roblox, scraperDescriptor as robloxScraper } from "./roblox"
 import { descriptor as snapchat } from "./snapchat"
@@ -28,6 +29,7 @@ export const MODULES: ModuleDescriptor[] = [
   telegram,
   telegramPhone,
   minecraft,
+  machine,
   instagram,
   instagramShare,
   tiktok,
@@ -38,8 +40,15 @@ export const MODULES: ModuleDescriptor[] = [
   robloxScraper,
 ]
 
-/** Screens that exist without a descriptor. */
-const BUILT_IN_ROUTES = ["/dashboard", "/settings"]
+/**
+ * Screens that exist without a descriptor.
+ *
+ * `/api` is here rather than in MODULES because API Access is not a lookup: it
+ * has no inputs, no server module and no metered call. Everything it renders is
+ * already in the Overview the app fetches at boot, so routing it through
+ * ModuleScreen would mean inventing a module id the server would reject.
+ */
+export const BUILT_IN_ROUTES = ["/dashboard", "/settings", "/api"]
 
 /**
  * The module owning a route, or undefined.

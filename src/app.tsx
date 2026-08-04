@@ -11,6 +11,7 @@ import { RegisterScreen } from "./auth/RegisterScreen"
 import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
 import { ModuleScreen } from "./modules/ModuleScreen"
+import { ApiAccess } from "./modules/api-access"
 import { moduleForRoute } from "./modules/registry"
 import { Settings } from "./settings/Settings"
 import { Walkthrough } from "./onboarding/Walkthrough"
@@ -227,6 +228,10 @@ export default function App() {
           <Shell route={route} onNavigate={setRoute}>
             {module ? (
               <ModuleScreen descriptor={module} />
+            ) : route === "/api" ? (
+              // Not a module: no inputs, no metered call, and its data is the
+              // overview already in hand. See BUILT_IN_ROUTES in the registry.
+              <ApiAccess overview={overview} />
             ) : route === "/settings" ? (
               <Settings overview={overview} integrity={integrity} onLoggedOut={handleLoggedOut} />
             ) : (
