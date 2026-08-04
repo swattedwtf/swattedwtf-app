@@ -95,6 +95,13 @@ type TikTokIntel = {
 }
 
 type TikTokData = {
+  /**
+   * False when the video fetch failed. Deliberately conservative: the provider
+   * returns an empty list for an unresolvable handle, a failed scrape, an
+   * unaffordable captcha solve AND a genuinely empty account, so this refuses
+   * to claim "no videos" rather than inventing a distinction it does not make.
+   */
+  videosAvailable: boolean
   kind: string
   query: string
   resolvedFrom: string | null
@@ -258,6 +265,7 @@ export function Result({ data }: ResultProps) {
       accountInfoAvailable: intel.accountInfoAvailable === true,
     },
     videos: list<TikTokVideo>(raw.videos),
+    videosAvailable: raw.videosAvailable === true,
     found: raw.found === true,
     kind: typeof raw.kind === "string" ? raw.kind : "username",
     username: typeof raw.username === "string" ? raw.username : "",
@@ -386,7 +394,9 @@ export function Result({ data }: ResultProps) {
             message={
               p.privateAccount
                 ? "This account is private, so its videos are not listed."
-                : "No videos found for this account."
+                : d.videosAvailable === false
+                  ? "Videos could not be retrieved, so we cannot say whether this account has any."
+                  : "No videos found for this account."
             }
           />
         ) : (

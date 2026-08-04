@@ -169,7 +169,9 @@ describe("TikTok result", () => {
 
   it("renders a sparse payload without throwing, using empty states", () => {
     const html = render(sparse)
-    expect(html).toContain("No videos found for this account.")
+    // An ABSENT marker must not license "no videos": the provider returns an
+    // empty list for a failed fetch and for a genuinely empty account alike.
+    expect(html).toContain("cannot say whether this account has any")
     expect(html).toContain("Not reported")
     expect(html).toContain("ghost")
   })

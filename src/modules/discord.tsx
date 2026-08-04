@@ -42,6 +42,10 @@ type DiscordData = {
   alts: string[]
   vpnAttempts: number
   messages: { total: number; items: Record<string, unknown>[] }
+  /** IP, email and source, when the plan and the provider both allowed it. */
+  osint: { ipAddress: string | null; email: string | null; source: string | null } | null
+  /** False when the alt-account scan never ran, which is not "no alts". */
+  altsChecked: boolean
 }
 
 function formatDate(iso: string | null): string {
@@ -87,6 +91,8 @@ export function Result({ data }: ResultProps) {
     vpnAttempts: typeof raw.vpnAttempts === "number" ? raw.vpnAttempts : 0,
     historyUnavailable: raw.historyUnavailable === true,
     stealerLocked: raw.stealerLocked === true,
+    altsChecked: raw.altsChecked === true,
+    osint: (raw.osint as DiscordData["osint"]) ?? null,
   }
 
   return (
@@ -182,17 +188,36 @@ export function Result({ data }: ResultProps) {
         )}
       </Section>
 
+      {/* The web's highest-value panel, which the desktop dropped entirely. */}
+      {d.osint && (
+        <Section title="Exposed contact">
+          <FieldGrid
+            fields={[
+              { label: "IP address", value: d.osint.ipAddress, mono: true },
+              { label: "Email", value: d.osint.email, mono: true },
+              { label: "Source", value: d.osint.source },
+            ]}
+          />
+        </Section>
+      )}
+
       <Section title="Alt accounts">
-        <FieldGrid
-          fields={[
-            {
-              label: "Linked alts",
-              value: d.alts.length > 0 ? d.alts.join(", ") : "",
-              mono: true,
-            },
-            { label: "VPN attempts", value: d.vpnAttempts > 0 ? String(d.vpnAttempts) : "" },
-          ]}
-        />
+        {/* The alt provider answers null on failure rather than throwing, so an
+            empty list with no marker read as "this account has no alts". */}
+        {!d.altsChecked ? (
+          <EmptyState message="The alt-account scan did not run, so nothing can be said about linked accounts." />
+        ) : (
+          <FieldGrid
+            fields={[
+              {
+                label: "Linked alts",
+                value: d.alts.length > 0 ? d.alts.join(", ") : "",
+                mono: true,
+              },
+              { label: "VPN attempts", value: d.vpnAttempts > 0 ? String(d.vpnAttempts) : "" },
+            ]}
+          />
+        )}
       </Section>
 
       <Section title={`Breaches${d.breaches.length ? ` (${d.breaches.length})` : ""}`}>

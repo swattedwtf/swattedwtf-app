@@ -39,6 +39,13 @@ type SnapchatData = {
     website: string | null
   }
   usernameHistory: string[]
+  /**
+   * Whether the email or phone could be resolved at all.
+   *
+   * "unavailable" means the resolver itself failed, which is NOT "no account is
+   * linked to this contact". The screen must not turn the first into the second.
+   */
+  contactStatus: "found" | "not_found" | "unavailable" | null
 }
 
 function LinkRow({ label, url }: { label: string; url: string | null }) {
@@ -81,19 +88,25 @@ export function Result({ data }: ResultProps) {
     profile: p,
     usernameHistory: list<string>(raw.usernameHistory),
     found: raw.found === true,
+    contactStatus: (raw.contactStatus as SnapchatData["contactStatus"]) ?? null,
   }
 
   if (!d.found) {
+    // Three different answers, and only one of them is "there is no account".
+    // The resolver failing, and nobody being linked to a contact, were rendered
+    // with the same sentence, which asserts something we never established.
+    const message =
+      d.contactStatus === "unavailable"
+        ? "The Snapchat resolver could not be reached, so we cannot say whether an account is linked to that contact."
+        : d.contactStatus === "not_found"
+          ? "No Snapchat account is linked to that contact."
+          : d.resolvedFrom
+            ? `Resolved to @${d.username}, but no Snapchat profile came back.`
+            : d.resolutionError || "No Snapchat account found for that query."
+
     return (
       <div className="space-y-4">
-        <EmptyState
-          message={
-            d.resolutionError ||
-            (d.resolvedFrom
-              ? `Resolved to @${d.resolvedFrom}, but no Snapchat profile was found.`
-              : "No Snapchat account found for that query.")
-          }
-        />
+        <EmptyState message={message} />
       </div>
     )
   }
