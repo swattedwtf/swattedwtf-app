@@ -11,8 +11,10 @@ import { RegisterScreen } from "./auth/RegisterScreen"
 import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
 import { ModuleScreen } from "./modules/ModuleScreen"
+import { StreamScreen } from "./modules/StreamScreen"
 import { ApiAccess } from "./modules/api-access"
 import { moduleForRoute } from "./modules/registry"
+import { streamModuleForRoute } from "./modules/stream-registry"
 import { Settings } from "./settings/Settings"
 import { Walkthrough } from "./onboarding/Walkthrough"
 import { hasSeenWalkthrough } from "./lib/onboarding"
@@ -219,6 +221,10 @@ export default function App() {
       // and the Shell's own `key={route}` remounts it, so switching modules
       // starts from an empty form rather than the previous module's answer.
       const module = moduleForRoute(route)
+      // A streaming screen (Search, Live Intelligence) owns its route the same
+      // way a one-shot module does, but renders over the SSE transport. Checked
+      // alongside the module lookup; the two route sets are disjoint.
+      const streamModule = streamModuleForRoute(route)
       // Sits over the shell rather than replacing it, so the app is already
       // built and warm behind the walkthrough and dismissing it reveals a
       // loaded dashboard rather than another loading state.
@@ -228,6 +234,8 @@ export default function App() {
           <Shell route={route} onNavigate={setRoute}>
             {module ? (
               <ModuleScreen descriptor={module} />
+            ) : streamModule ? (
+              <StreamScreen descriptor={streamModule} />
             ) : route === "/api" ? (
               // Not a module: no inputs, no metered call, and its data is the
               // overview already in hand. See BUILT_IN_ROUTES in the registry.

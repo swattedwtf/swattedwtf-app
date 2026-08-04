@@ -63,6 +63,9 @@ pub fn run() {
 
             app.manage(AppState { client });
             app.manage(updater::PendingUpdate::default());
+            // Registry of live SSE streams (Search, Live Intelligence), so a
+            // running stream can be cancelled by id from the webview.
+            app.manage(api::stream::StreamRegistry::default());
 
             // Preferences live beside the session fallback, in the same local
             // data dir, and are loaded before anything reads them. A missing or
@@ -114,6 +117,8 @@ pub fn run() {
             commands::logout,
             commands::get_overview,
             commands::lookup,
+            commands::stream_start,
+            commands::stream_cancel,
             commands::fetch_image,
             commands::get_settings,
             commands::set_shortcut,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { BUILT_IN_ROUTES, MODULES, enabledRoutes, moduleForRoute } from "./registry"
+import { streamRoutes } from "./stream-registry"
 import type { ModuleDescriptor } from "./types"
 import { NAV, flattenNav, isEnabled } from "../shell/nav"
 
@@ -60,6 +61,9 @@ describe("a registered module", () => {
           // a descriptor, so picking one would make the "starts disabled"
           // precondition false before the stub was ever pushed.
           !BUILT_IN_ROUTES.includes(h) &&
+          // Nor a streaming screen: those are enabled through the stream
+          // registry, so one would make the "starts disabled" precondition false.
+          !streamRoutes().includes(h) &&
           !MODULES.some((m) => m.route === h),
       ) ?? "/unbuilt"
 

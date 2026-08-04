@@ -3,6 +3,7 @@
  * typed function so no component ever calls invoke() with a raw string.
  */
 import { invoke } from "@tauri-apps/api/core"
+import { listen } from "@tauri-apps/api/event"
 import type { IntegrityReport, UpdateResult } from "../boot/machine"
 
 export type Overview = {
@@ -152,4 +153,134 @@ export const ipc = {
    * rejected URL here is a bug in the payload, not something to work around.
    */
   fetchImage: (url: string) => invoke<string>("fetch_image", { url }),
+}
+
+/** One parsed SSE `data:` event from a stream. Its shape is the module's own. */
+export type StreamFrame = Record<string, unknown>
+
+/** A handle to a running stream. `cancel` is safe to call any number of times,
+ *  including after the stream has already finished. */
+export type StreamHandle = { cancel: () => void }
+
+export type StreamHandlers = {
+  /** One parsed SSE data event. Called in arrival order. */
+  onFrame: (frame: StreamFrame) => void
+  /** The server closed the stream cleanly. */
+  onDone: () => void
+  /** The connection failed mid-stream. Distinct from onDone so the screen can
+   *  offer Retry rather than treating it as "finished with nothing". */
+  onError: (message: string) => void
+}
+
+/** The Tauri event every stream chunk, end and error rides. Mirrors
+ *  src-tauri/src/api/stream.rs::STREAM_EVENT. */
+const STREAM_EVENT = "desktop-stream"
+
+type StreamMsg =
+  | { kind: "chunk"; id: number; data: string }
+  | { kind: "end"; id: number }
+  | { kind: "error"; id: number; message: string }
+
+/**
+ * Starts a streaming lookup and delivers its frames as they arrive.
+ *
+ * The transport is Rust: it owns the connection and the session cookie, and
+ * forwards decoded SSE text over the `desktop-stream` Tauri event, one message
+ * per chunk, tagged with the stream's id. This function turns that byte stream
+ * back into parsed SSE frames.
+ *
+ * A refusal at connect time (a 402 upgrade wall, a 429, a dead session) REJECTS
+ * this promise before any frame arrives, so a caller classifies it exactly as
+ * it does a one-shot lookup failure. Once the promise resolves, the stream is
+ * live and everything else arrives through the handlers.
+ *
+ * The listener is attached BEFORE the stream is started and any frames that land
+ * before the id is known are buffered and replayed, so an instantly-answering
+ * source is never dropped in the gap.
+ */
+export async function startStream(
+  module: string,
+  input: Record<string, unknown>,
+  handlers: StreamHandlers,
+): Promise<StreamHandle> {
+  let id: number | null = null
+  let closed = false
+  const early: StreamMsg[] = []
+  let buffer = ""
+  let unlisten: (() => void) | null = null
+
+  const cleanup = () => {
+    closed = true
+    if (unlisten) {
+      unlisten()
+      unlisten = null
+    }
+  }
+
+  // Parse whole SSE frames (`data: ...\n\n`) out of the accumulated text and
+  // dispatch each JSON event. Comment lines (heartbeats, the open marker, the
+  // anti-buffering padding) carry no `data:` line and are skipped.
+  const flush = () => {
+    let idx: number
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const block = buffer.slice(0, idx)
+      buffer = buffer.slice(idx + 2)
+      const data = block
+        .split("\n")
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5).trim())
+        .join("\n")
+      if (!data) continue
+      let frame: StreamFrame
+      try {
+        frame = JSON.parse(data) as StreamFrame
+      } catch {
+        continue
+      }
+      handlers.onFrame(frame)
+    }
+  }
+
+  const process = (msg: StreamMsg) => {
+    if (closed) return
+    if (msg.kind === "chunk") {
+      buffer += msg.data
+      flush()
+    } else if (msg.kind === "end") {
+      flush()
+      cleanup()
+      handlers.onDone()
+    } else {
+      cleanup()
+      handlers.onError(msg.message)
+    }
+  }
+
+  unlisten = await listen<StreamMsg>(STREAM_EVENT, (e) => {
+    const msg = e.payload
+    if (id === null) {
+      early.push(msg)
+      return
+    }
+    if (msg.id !== id) return
+    process(msg)
+  })
+
+  try {
+    id = await invoke<number>("stream_start", { module, input })
+  } catch (err) {
+    cleanup()
+    throw err
+  }
+
+  // Replay anything that arrived for our id while the listener was up but the id
+  // was not yet known.
+  for (const m of early) if (m.id === id) process(m)
+
+  return {
+    cancel: () => {
+      if (id !== null) void invoke("stream_cancel", { id }).catch(() => {})
+      cleanup()
+    },
+  }
 }

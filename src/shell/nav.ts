@@ -13,6 +13,7 @@
  * actually render.
  */
 import { enabledRoutes } from "../modules/registry"
+import { streamRoutes } from "../modules/stream-registry"
 
 export type NavItem = {
   label: string
@@ -30,7 +31,7 @@ export type NavGroup = { label: string; items: NavItem[] }
  * reads better than a function call in tests and in the Sidebar's comments;
  * `isEnabled` is what code should actually use.
  */
-export const ENABLED_ROUTES: readonly string[] = enabledRoutes()
+export const ENABLED_ROUTES: readonly string[] = [...enabledRoutes(), ...streamRoutes()]
 
 export const NAV: NavGroup[] = [
   {
@@ -125,7 +126,7 @@ export const NAV: NavGroup[] = [
  * registered after this module was first evaluated is still honoured.
  */
 export function isEnabled(href: string): boolean {
-  return enabledRoutes().includes(href)
+  return enabledRoutes().includes(href) || streamRoutes().includes(href)
 }
 
 /** Every leaf in the tree. Parents that exist only to group children are omitted. */

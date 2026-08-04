@@ -4,7 +4,8 @@
 //! inventory of everything the webview is allowed to do. Note what is absent:
 //! nothing here returns the session cookie, so the frontend has no path to it.
 
-use crate::api::{auth, client::ApiClient, lookup as lookup_api, overview};
+use crate::api::{auth, client::ApiClient, lookup as lookup_api, overview, stream as stream_api};
+use crate::api::stream::StreamRegistry;
 use crate::captcha;
 use crate::error::AppError;
 use crate::settings::SettingsState;
@@ -72,6 +73,35 @@ pub async fn lookup(
     input: serde_json::Value,
 ) -> Result<serde_json::Value, AppError> {
     lookup_api::lookup(&state.client, &module, input).await
+}
+
+/// Opens a streaming lookup and returns the id its events ride under.
+///
+/// `module` is a key into a static table on the SERVER, never a URL or a path,
+/// exactly like `lookup`. The session cookie stays on this side: the pump reads
+/// the SSE body here and forwards decoded text to the webview over the
+/// `desktop-stream` Tauri event, so the frontend never touches the connection.
+///
+/// A refusal (a 402 upgrade wall, a 429 rate limit, a dead session) is thrown
+/// from HERE before the id exists, so the screen renders the same panels a
+/// one-shot lookup would.
+#[tauri::command]
+pub async fn stream_start(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    streams: State<'_, StreamRegistry>,
+    module: String,
+    input: serde_json::Value,
+) -> Result<u64, AppError> {
+    stream_api::start(app, &state.client, &streams, module, input).await
+}
+
+/// Cancels a running stream by id. A no-op for one that already finished, so the
+/// frontend can call it unconditionally on unmount.
+#[tauri::command]
+pub async fn stream_cancel(streams: State<'_, StreamRegistry>, id: u64) -> Result<(), AppError> {
+    stream_api::cancel(&streams, id);
+    Ok(())
 }
 
 /// Fetches an image and hands the webview a `data:` URL.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { BUILT_IN_ROUTES, MODULES } from "../modules/registry"
+import { streamRoutes } from "../modules/stream-registry"
 import { ENABLED_ROUTES, NAV, flattenNav, isEnabled } from "./nav"
 
 describe("NAV", () => {
@@ -57,23 +58,31 @@ describe("NAV", () => {
 })
 
 describe("isEnabled", () => {
-  it("enables the built-in screens plus every registered module", () => {
-    // Derived from the registry, not hand-listed. An earlier version spelled the
-    // expected routes out and had to be edited every time a module shipped,
+  it("enables the built-in screens plus every registered module and streaming screen", () => {
+    // Derived from the registries, not hand-listed. An earlier version spelled
+    // the expected routes out and had to be edited every time a module shipped,
     // which tests the editor rather than the derivation.
-    expect(ENABLED_ROUTES).toEqual([...BUILT_IN_ROUTES, ...MODULES.map((m) => m.route)])
+    expect(ENABLED_ROUTES).toEqual([
+      ...BUILT_IN_ROUTES,
+      ...MODULES.map((m) => m.route),
+      ...streamRoutes(),
+    ])
     expect(isEnabled("/dashboard")).toBe(true)
     expect(isEnabled("/settings")).toBe(true)
     for (const m of MODULES) expect(isEnabled(m.route), `${m.route} should be enabled`).toBe(true)
+    // The streaming screens are live this pass.
+    for (const r of streamRoutes()) expect(isEnabled(r), `${r} should be enabled`).toBe(true)
+    expect(isEnabled("/search")).toBe(true)
+    expect(isEnabled("/live-intelligence")).toBe(true)
   })
 
   it("still disables every nav route that has no descriptor yet", () => {
-    const live = new Set(MODULES.map((m) => m.route))
+    const live = new Set([...MODULES.map((m) => m.route), ...streamRoutes()])
     const unbuilt = flattenNav()
       .map((i) => i.href)
       .filter((h) => !live.has(h) && !BUILT_IN_ROUTES.includes(h) && !h.startsWith("http"))
-    // There are always some: the whole Tools group and the streaming screens are
-    // out of scope for this pass.
+    // There are always some: the whole Tools group and several Intelligence
+    // screens (Investigations, Agent, Monitor, ...) are out of scope for this pass.
     expect(unbuilt.length).toBeGreaterThan(0)
     for (const href of unbuilt) expect(isEnabled(href), `${href} should be disabled`).toBe(false)
   })

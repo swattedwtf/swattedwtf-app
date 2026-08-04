@@ -30,6 +30,12 @@ pub struct ApiClient {
     /// policy of ten hops would leave that check binding only the first one. The
     /// server-side proxy sets `redirect: "error"` for the same reason.
     images: reqwest::Client,
+    /// SSE streaming only. Separate from `http` because `http`'s 30s total
+    /// timeout would kill a Live Intelligence sweep, which the server runs for
+    /// up to 180s. This client has NO total timeout; instead a read timeout cuts
+    /// a connection that has gone silent, which the server's 15s heartbeat keeps
+    /// from ever tripping on a healthy stream.
+    stream: reqwest::Client,
     jar: Arc<CookieStoreMutex>,
     store: SessionStore,
 }
@@ -50,7 +56,16 @@ impl ApiClient {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| AppError::Internal(e.to_string()))?;
-        Ok(Self { http, images, jar, store })
+        let stream = reqwest::Client::builder()
+            .cookie_provider(jar.clone())
+            .user_agent(concat!("swattedwtf-app/", env!("CARGO_PKG_VERSION")))
+            // No total timeout: a sweep can legitimately run for minutes. The
+            // read timeout is the safety net for a connection that stops
+            // producing bytes entirely; the server heartbeats every 15s.
+            .read_timeout(std::time::Duration::from_secs(60))
+            .build()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        Ok(Self { http, images, stream, jar, store })
     }
 
     fn url(&self, path: &str) -> String {
@@ -190,6 +205,37 @@ impl ApiClient {
             .await
             .map_err(|e| AppError::Network(e.to_string()))?;
         Self::read(resp).await
+    }
+
+    /// Opens an SSE stream, returning the live response for the caller to read
+    /// chunk by chunk.
+    ///
+    /// A non-2xx is turned into `AppError::Api` HERE, before any streaming
+    /// starts, and by the same `error_from` the JSON path uses, so a 402
+    /// `launch_locked` on a stream renders the upgrade panel exactly as it does
+    /// on a lookup rather than opening an empty stream that never produces a
+    /// frame. Only a 2xx response is handed back to be pumped.
+    pub async fn post_stream<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<reqwest::Response, AppError> {
+        let resp = self
+            .stream
+            .post(self.url(path))
+            .header(reqwest::header::ORIGIN, Self::origin())
+            .header(reqwest::header::ACCEPT, "text/event-stream")
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| AppError::Network(e.to_string()))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(crate::api::lookup::error_from(status.as_u16(), &text));
+        }
+        Ok(resp)
     }
 
     /// POST returning the raw status and body.
