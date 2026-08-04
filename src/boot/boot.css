@@ -195,26 +195,9 @@
   animation: stageSpin 1.05s linear infinite;
 }
 
-.stage-ring-arc-inner {
-  transform-origin: 50% 50%;
-  animation: stageSpinBack 2.6s linear infinite;
-}
-
-/* The leading tip of the sweep, bright enough to read as a light source. */
-.stage-ring-head {
-  transform-origin: 50% 50%;
-  animation: stageSpin 1.05s linear infinite;
-}
-
 @keyframes stageSpin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes stageSpinBack {
-  to {
-    transform: rotate(-360deg);
   }
 }
 
