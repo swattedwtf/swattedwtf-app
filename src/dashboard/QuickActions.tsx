@@ -1,6 +1,5 @@
 import { useState } from "react"
 import {
-  BellRing,
   Bot,
   ExternalLink,
   FolderSearch,
@@ -65,10 +64,6 @@ type Action = {
 
 const ACTIONS: Action[] = [
   { label: "Search", route: "/search", url: `${BASE}/search`, icon: Search },
-  // Monitor rather than Live Intelligence here: Live Intelligence already has a
-  // sidebar row and a dashboard tile duplicated it, so this slot points at
-  // Monitor (watchlists / alerts), a native screen users reach far less often.
-  { label: "Monitor", route: "/monitor", url: `${BASE}/monitor`, icon: BellRing },
   { label: "Investigations", route: "/investigations", url: `${BASE}/investigations`, icon: FolderSearch },
   { label: "Reverse Face", route: "/face", url: `${BASE}/face`, icon: ScanFace },
   { label: "Plans", route: "/plans", url: `${BASE}/plans`, icon: Tag },

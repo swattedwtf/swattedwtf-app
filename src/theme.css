@@ -670,9 +670,20 @@ textarea:focus-visible {
 
 .stat-card {
   container-type: inline-size;
+  /* A flex column whose body fills it. In the four-across row every card is
+     stretched to the tallest (the one with a progress bar), but a plain block
+     .glass-body only grows to its own content, so the shorter cards left the
+     outer frame's gradient showing as a strip below the body: the "card ends,
+     then a glass layer under it" look. Filling the body closes that gap. */
+  display: flex;
+  flex-direction: column;
   transition:
     transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
     background 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.stat-card > .glass-body {
+  flex: 1;
 }
 
 /* Four across starts at lg (1024px), but the window's minimum is 1040px, where
