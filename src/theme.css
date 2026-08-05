@@ -873,6 +873,62 @@ textarea:focus-visible {
  * the pointer or the scroll. That is the mild end of what the preference exists
  * to suppress, so it runs for everyone. */
 
+/* ---- Toast --------------------------------------------------------------
+   A small confirmation that pops up over a screen and retires on its own, for
+   the moments a button's own label cannot carry the feedback (a code copied, a
+   recovery file written). Glass chrome so it reads as part of the app. */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  border-top: 1px solid var(--glass-edge);
+  background: oklch(0.14 0 0 / 0.82);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.12),
+    0 18px 40px -16px oklch(0 0 0 / 0.8);
+  color: #fff;
+  font-size: 13px;
+  animation: toastIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ---- Close fade ---------------------------------------------------------
+   The whole shell dips and fades just before the window is destroyed, so the
+   app leaves the screen the way its screens arrive rather than blinking out.
+   Applied to #root: the native window behind it is transparent, so fading the
+   content reveals the desktop through the rounded corners and reads as the
+   window itself dissolving. See fadeOnClose in shell/window.ts. */
+@keyframes appFadeOut {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+.app-closing #root {
+  animation: appFadeOut 190ms cubic-bezier(0.4, 0, 1, 1) both;
+  transform-origin: center;
+  pointer-events: none;
+}
+
 /* ---- Window shape -------------------------------------------------------
    A borderless window cannot be rounded by DWM (there is no frame to round),
    so the rounding is done here and the native window is transparent behind it.

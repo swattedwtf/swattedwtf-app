@@ -9,12 +9,10 @@ import {
   NotebookPen,
   Pencil,
   Plus,
-  Sparkles,
   Trash2,
 } from "lucide-react"
 
 import { classifyError, type ClassifiedError } from "../lib/errors"
-import { ipc } from "../lib/ipc"
 import { OutcomePanel } from "../modules/ModuleScreen"
 import {
   NOTES_MAX,
@@ -44,42 +42,9 @@ import {
  *
  * The web's structure is reproduced section for section: an icon header over a
  * create row, then "Your cases" as a two-up grid of cards; and inside a case, a
- * toolbar of back / name / status / saved / delete over a two-column body with
- * the notepad on the left and the assistant panel on the right.
- *
- * WHAT IS NOT HERE: the AI chat itself. On the web, that right-hand panel is a
- * live conversation, gated on an active QUEMLY plan, which is a separate
- * subscription from Swatted. The only streaming path this client can reach runs
- * `requireLookupAccess`, so reproducing the chat would meter an assistant turn
- * as a Heist lookup and refuse a Quemly subscriber on a lower Swatted plan.
- * Instead the panel keeps the web's exact anatomy, header bar, assistant bubble
- * and footer, and says plainly where the assistant lives and, critically, that a
- * plan that does not include it is not a broken plan. A customer who had bought
- * Heist plus API Access read the web's bare "Quemly plan required" as their
- * purchase having failed, and that misreading is what this copy exists to
- * prevent.
+ * toolbar of back / name / status / saved / delete over the notepad. The web's
+ * AI chat aside is deliberately not carried here.
  */
-
-/**
- * The assistant's own product page.
- *
- * This spelling is correct and resolves. "quemly.swattedw.tf", which is what
- * the product name suggests, does not exist, and sending someone there would be
- * a dead end at the exact moment they have been told where to go. Exported so
- * that is checkable rather than a string nobody ever reads again.
- */
-export const QUEMLY_URL = "https://qemuly.swattedw.tf"
-
-/** The same case on the web dashboard, where the assistant lives. */
-export function caseWebUrl(id: string): string {
-  return `https://swattedw.tf/dashboard/investigations/${encodeURIComponent(id)}`
-}
-
-function openWeb(url: string) {
-  // Never in the webview: a link opens in the user's own browser, with an
-  // address bar and none of our state.
-  void ipc.openExternal(url).catch(() => {})
-}
 
 /** How long a pause in typing means "save it now". Matches the web notepad. */
 const AUTOSAVE_MS = 700
@@ -451,7 +416,6 @@ export function CaseList({ onOpen }: { onOpen: (id: string) => void }) {
  */
 export function CaseWorkspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [record, setRecord] = useState<Case | null>(null)
-  const [assistant, setAssistant] = useState(false)
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<ClassifiedError | null>(null)
   const [saveState, setSaveState] = useState<SaveState>("idle")
@@ -478,7 +442,6 @@ export function CaseWorkspace({ id, onBack }: { id: string; onBack: () => void }
     try {
       const payload = await openCase(id)
       setRecord(payload.investigation)
-      setAssistant(payload.assistant.active)
       setName(payload.investigation.name)
       setNotes(payload.investigation.notes)
       nameDirty.current = false
@@ -654,8 +617,7 @@ export function CaseWorkspace({ id, onBack }: { id: string; onBack: () => void }
       {failure ? <OutcomePanel outcome={failure} onRetry={() => void load()} /> : null}
 
       {loading ? (
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px]" aria-hidden="true">
-          <div className="skeleton h-[26rem]" />
+        <div aria-hidden="true">
           <div className="skeleton h-[26rem]" />
         </div>
       ) : !record ? (
@@ -666,18 +628,15 @@ export function CaseWorkspace({ id, onBack }: { id: string; onBack: () => void }
         />
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-            <NotesPanel
-              notes={notes}
-              view={notesView}
-              onView={setNotesView}
-              onChange={(next) => {
-                notesDirty.current = true
-                setNotes(next)
-              }}
-            />
-            <AssistantPanel active={assistant} caseId={record.id} />
-          </div>
+          <NotesPanel
+            notes={notes}
+            view={notesView}
+            onView={setNotesView}
+            onChange={(next) => {
+              notesDirty.current = true
+              setNotes(next)
+            }}
+          />
 
           <p className="font-mono text-[11px] text-white/70">
             Opened {relativeTime(record.createdAt)} · updated {relativeTime(record.updatedAt)}
@@ -821,97 +780,4 @@ function inlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       }
       return <span key={key}>{part}</span>
     })
-}
-
-/**
- * The assistant panel: the web's chat aside, in the one state this client can
- * honestly offer.
- *
- * Same anatomy as the web, header bar with the assistant's name, a message from
- * the assistant, then a footer where the composer sits, so it reads as the same
- * panel rather than as a hole where a feature should be.
- *
- * Two states, and the difference between them is the whole point. `active` says
- * the account holds a Quemly subscription, so the assistant exists and simply
- * runs elsewhere. Inactive says the assistant is sold separately, and says it in
- * the same breath as "your plan is fine", because the failure this replaces was
- * a customer concluding a working purchase had broken.
- *
- * Exported so the copy and the destinations can be asserted directly. A wrong
- * URL here is a dead end for someone who has just been told where to go, and it
- * would be invisible in a render that only checked the panel appeared.
- */
-export function AssistantPanel({ active, caseId }: { active: boolean; caseId: string }) {
-  return (
-    <aside className="glass fade-in flex flex-col overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3">
-        <span className="glass-tile grid h-7 w-7 shrink-0 place-items-center rounded-lg">
-          <Sparkles className="h-3.5 w-3.5 text-white" aria-hidden="true" />
-        </span>
-        <p className="min-w-0 truncate text-sm font-semibold tracking-tight text-white">
-          OSINT Assistant
-        </p>
-        <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
-          {active ? "On the web" : "Add-on"}
-        </span>
-      </div>
-
-      <div className="flex-1 space-y-3 p-4">
-        <div className="glass-tile p-3.5 text-[13px] leading-relaxed text-white/80">
-          {active ? (
-            <div className="space-y-2">
-              <p className="font-medium text-white">Your Quemly subscription is active.</p>
-              <p>
-                The assistant reads this case, formats your notes, runs lookups and writes what it
-                finds straight back into the notepad.
-              </p>
-              <p>
-                It runs on the web dashboard rather than in the desktop app. These are the same notes
-                there, so open the case on the web to talk it through.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="font-medium text-white">The assistant is a separate subscription.</p>
-              <p>
-                The AI that reads a case and talks it through with you is Quemly. It is not part of a
-                Swatted plan and it is not part of API Access.
-              </p>
-              <p>
-                Nothing on your account is broken or missing. Your plan, your lookups and any add-on
-                you bought all work normally. This one panel is the only thing Quemly covers.
-              </p>
-              <p>Cases and notes are yours either way, on the desktop and on the web.</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="border-t border-white/[0.08] p-3">
-        <div className="flex flex-wrap gap-2">
-          {!active ? (
-            <button
-              type="button"
-              onClick={() => openWeb(QUEMLY_URL)}
-              className="btn-secondary btn-compact"
-            >
-              About Quemly
-              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          ) : null}
-          {caseId ? (
-            <button
-              type="button"
-              onClick={() => openWeb(caseWebUrl(caseId))}
-              className="btn-secondary btn-compact"
-            >
-              Open this case on the web
-              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          ) : null}
-        </div>
-        <p className="mt-2 font-mono text-[10px] text-white/50">Opens in your browser.</p>
-      </div>
-    </aside>
-  )
 }

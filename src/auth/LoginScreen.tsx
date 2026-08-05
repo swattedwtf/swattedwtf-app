@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { KeyRound } from "lucide-react"
 
 import { ipc } from "../lib/ipc"
 import { formatLoginCode, isCompleteLoginCode, normalizeLoginCode } from "./code"
@@ -46,52 +47,71 @@ export function LoginScreen({
   }
 
   return (
-    <div data-tauri-drag-region className="drag flex h-full flex-col items-center justify-center gap-8 boot-surface px-10">
-      <p className="text-[26px] font-medium tracking-[-0.02em] text-[var(--mark-fg)]">
-        swatted<span className="text-[var(--mark-tld)]">.wtf</span>
-      </p>
+    <div
+      data-tauri-drag-region
+      className="drag boot-surface flex h-full flex-col items-center justify-center px-8"
+    >
+      <div className="no-drag w-full max-w-[380px]">
+        <p className="mb-6 text-center text-[22px] font-medium tracking-[-0.02em] text-[var(--mark-fg)]">
+          swatted<span className="text-[var(--mark-tld)]">.wtf</span>
+        </p>
 
-      <div className="no-drag w-full max-w-[320px]">
-        <label
-          htmlFor="login-code"
-          className="block font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]"
-        >
-          Login code
-        </label>
-        <input
-          id="login-code"
-          autoFocus
-          autoComplete="off"
-          spellCheck={false}
-          inputMode="numeric"
-          aria-invalid={error ? true : undefined}
-          value={formatLoginCode(value)}
-          onChange={(e) => setValue(normalizeLoginCode(e.target.value))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void submit()
-          }}
-          placeholder="0000 0000 0000"
-          className="mt-2 w-full select-text glass-input px-4 py-3 text-center font-mono text-lg tabular-nums tracking-[0.22em] outline-none"
-        />
+        <div className="glass">
+          <div className="glass-body">
+            <div className="flex flex-col items-center text-center">
+              <span className="glass-tile grid h-12 w-12 place-items-center rounded-2xl">
+                <KeyRound className="h-5 w-5 text-white" aria-hidden="true" />
+              </span>
+              <h1 className="mt-4 text-lg font-semibold tracking-tight text-white">Welcome back</h1>
+              <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-muted-foreground)]">
+                Enter the 12-digit login code from when you signed up.
+              </p>
+            </div>
 
-        {error ? (
-          <p role="alert" className="mt-3 text-center text-xs text-[var(--color-destructive)]">
-            {error}
-          </p>
-        ) : null}
+            <div className="mt-6">
+              <label
+                htmlFor="login-code"
+                className="block font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]"
+              >
+                Login code
+              </label>
+              <input
+                id="login-code"
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+                inputMode="numeric"
+                aria-invalid={error ? true : undefined}
+                value={formatLoginCode(value)}
+                onChange={(e) => setValue(normalizeLoginCode(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submit()
+                }}
+                placeholder="0000 0000 0000"
+                className="mt-2 h-12 w-full select-text glass-input px-4 text-center font-mono text-lg tabular-nums tracking-[0.22em] outline-none"
+              />
+            </div>
 
-        {/* The label does not change while submitting: swapping "Sign in" for
-            "Verifying..." resizes the control under the pointer mid-press. The
-            busy state is aria-busy plus the ring the .btn-primary rules draw. */}
-        <button
-          type="button"
-          disabled={!complete || busy}
-          aria-busy={busy || undefined}
-          onClick={() => void submit()}
-          className="btn-primary mt-5 w-full"
-        >
-          Sign in
-        </button>
+            {error ? (
+              <p role="alert" className="mt-3 text-center text-xs text-[var(--color-destructive)]">
+                {error}
+              </p>
+            ) : null}
+
+            {/* The label does not change while submitting: swapping "Sign in" for
+                "Verifying..." resizes the control under the pointer mid-press. The
+                busy state is aria-busy plus the ring the .btn-primary rules draw. */}
+            <button
+              type="button"
+              disabled={!complete || busy}
+              aria-busy={busy || undefined}
+              onClick={() => void submit()}
+              className="btn-primary mt-5 w-full"
+            >
+              Sign in
+            </button>
+          </div>
+        </div>
 
         <button
           type="button"

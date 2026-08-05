@@ -149,7 +149,8 @@ describe("Plans screen", () => {
     )
     expect(html).toContain("Get Heist")
     expect(html).not.toContain("Get Premium")
-    expect(html).toContain("Your current plan")
+    // The tier already held renders a disabled "Current plan" pill, matching the web.
+    expect(html).toContain("Current plan")
     // The credited difference is named rather than shown as a mystery discount.
     expect(html).toContain("$35")
     expect(html).toContain("credited for your current plan")
@@ -168,7 +169,8 @@ describe("Plans screen", () => {
     )
     expect(html).not.toContain("Get Heist")
     expect(html).not.toContain("Get Premium")
-    expect(html).toContain("Lower tier than Heist")
+    // A lower tier renders a disabled "Downgrade" pill, never a purchase, matching the web.
+    expect(html).toContain("Downgrade")
   })
 
   it("shows the account discount against the struck-through list price", () => {

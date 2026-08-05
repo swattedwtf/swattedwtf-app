@@ -110,15 +110,31 @@ function termCaption(tier: PlanTier): string {
   return "Monthly subscription"
 }
 
+/**
+ * The tier's action: label, whether it is pressable, and whether it is an
+ * upgrade (which gets the filled treatment and the arrow).
+ *
+ * Mirrors getPlanState in app/dashboard/plans/plans-client.tsx exactly, so the
+ * desktop reads the same as the web: one full-width pill per card, disabled for
+ * everything that is not a purchase, with the same one-word copy. This replaces
+ * the old free-form captions ("Every account starts here", "Lower tier than X,
+ * not a purchase") that read as filler beside the real buttons.
+ */
+function planCta(tier: PlanTier): { cta: string; disabled: boolean; isUpgrade: boolean } {
+  if (tier.relation === "upgrade") {
+    return { cta: `Get ${tier.shortName || tier.name}`, disabled: false, isUpgrade: true }
+  }
+  if (tier.relation === "current") return { cta: "Current plan", disabled: true, isUpgrade: false }
+  if (tier.id === "free") return { cta: "Default", disabled: true, isUpgrade: false }
+  return { cta: "Downgrade", disabled: true, isUpgrade: false }
+}
+
 function TierCard({
   tier,
-  currentLabel,
   discountPercent,
   onBuy,
 }: {
   tier: PlanTier
-  /** The account's current tier, named in the downgrade copy. */
-  currentLabel: string
   discountPercent: number
   onBuy: (tier: PlanTier) => void
 }) {
@@ -158,7 +174,7 @@ function TierCard({
         </p>
 
         <div className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-4xl font-semibold tracking-tight tabular-nums text-white">
+          <span className="text-5xl font-medium tracking-tight tabular-nums text-white">
             {formatUsd(tier.yourPriceUsd)}
           </span>
           <span className="text-sm text-white/70">{tier.term}</span>
@@ -182,24 +198,33 @@ function TierCard({
           </p>
         ) : null}
 
-        <div className="mt-6">
-          {tier.relation === "upgrade" ? (
-            <button type="button" onClick={() => onBuy(tier)} className="btn-primary w-full">
-              Get {tier.shortName || tier.name}
-              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+        {(() => {
+          const { cta, disabled, isUpgrade } = planCta(tier)
+          return (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) onBuy(tier)
+              }}
+              className={`group mt-7 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                isUpgrade && tier.highlight
+                  ? "bg-white text-[#0b0b0b] hover:bg-white/90"
+                  : isUpgrade
+                    ? "border border-white/15 bg-transparent text-white hover:border-white/40 hover:bg-white/[0.06]"
+                    : "border border-white/12 bg-transparent text-white/60"
+              }`}
+            >
+              {cta}
+              {isUpgrade ? (
+                <ArrowUpRight
+                  className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              ) : null}
             </button>
-          ) : (
-            // Not a disabled button: there is nothing to press here, and a
-            // greyed-out control reads as something that might work later.
-            <p className="glass-tile px-3 py-2.5 text-center text-[13px] text-white/70">
-              {tier.relation === "current"
-                ? "Your current plan"
-                : tier.relation === "downgrade"
-                  ? `Lower tier than ${currentLabel}, not a purchase`
-                  : "Every account starts here"}
-            </p>
-          )}
-        </div>
+          )
+        })()}
 
         <div className="my-6 border-t border-white/[0.06]" />
 
@@ -248,8 +273,6 @@ export function Plans({
   const plans = withDefaults(current?.plans, EMPTY_PLANS)
   const tiers = list<Partial<PlanTier>>(plans.tiers).map((t) => withDefaults(t, EMPTY_TIER))
   const currentTier = tiers.find((t) => t.relation === "current")
-  const currentLabel =
-    currentTier?.shortName || currentTier?.name || current?.plan?.label || "your current plan"
 
   const refresh = () => {
     if (refreshing) return
@@ -366,7 +389,6 @@ export function Plans({
             <TierCard
               key={tier.id}
               tier={tier}
-              currentLabel={currentLabel}
               discountPercent={plans.discountPercent}
               onBuy={buy}
             />

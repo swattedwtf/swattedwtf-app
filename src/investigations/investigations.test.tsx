@@ -11,13 +11,11 @@ import {
   patchCase,
   relativeTime,
   removeCase,
-  toAssistant,
   toCase,
   toSummary,
   validateName,
 } from "./api"
 import {
-  AssistantPanel,
   CaseCard,
   CaseList,
   CaseWorkspace,
@@ -25,8 +23,6 @@ import {
   NO_CASES_TITLE,
   NotesMarkdown,
   NotesPanel,
-  QUEMLY_URL,
-  caseWebUrl,
 } from "./Investigations"
 
 vi.mock("../lib/ipc", () => ({
@@ -103,14 +99,6 @@ describe("coercion", () => {
     }
   })
 
-  it("treats an unstated assistant as unavailable, never as available", () => {
-    // Defaulting the other way would tell someone without the subscription that
-    // they have it, and send them to a panel that refuses them.
-    for (const payload of [undefined, null, {}, { active: "yes" }, { active: 1 }]) {
-      expect(toAssistant(payload).active).toBe(false)
-    }
-    expect(toAssistant({ active: true }).active).toBe(true)
-  })
 })
 
 describe("validateName", () => {
@@ -149,23 +137,20 @@ describe("relativeTime", () => {
 })
 
 describe("the calls", () => {
-  it("lists cases and the assistant's availability in one call", async () => {
+  it("lists cases in one call", async () => {
     call.mockResolvedValue({
       investigations: [{ ...row, notesChars: 3 }],
-      assistant: { active: true },
     })
     const payload = await listCases()
     expect(call).toHaveBeenCalledWith("list")
     expect(payload.cases).toHaveLength(1)
     expect(payload.cases[0].id).toBe("case_1")
-    expect(payload.assistant.active).toBe(true)
   })
 
   it("renders an answer with no cases field at all as an empty list", async () => {
     call.mockResolvedValue({})
     const payload = await listCases()
     expect(payload.cases).toEqual([])
-    expect(payload.assistant.active).toBe(false)
   })
 
   it("renders a cases field that is not a list as an empty one", async () => {
@@ -174,11 +159,10 @@ describe("the calls", () => {
   })
 
   it("opens one case", async () => {
-    call.mockResolvedValue({ investigation: row, assistant: { active: false } })
+    call.mockResolvedValue({ investigation: row })
     const payload = await openCase("case_1")
     expect(call).toHaveBeenCalledWith("get", { id: "case_1" })
     expect(payload.investigation.notes).toBe("found the seller")
-    expect(payload.assistant.active).toBe(false)
   })
 
   it("trims a case name on the way out", async () => {
@@ -226,8 +210,6 @@ describe("the screen renders defensively", () => {
     const views = [
       renderToStaticMarkup(<CaseList onOpen={() => {}} />),
       renderToStaticMarkup(<CaseWorkspace id="case_1" onBack={() => {}} />),
-      renderToStaticMarkup(<AssistantPanel active={false} caseId="case_1" />),
-      renderToStaticMarkup(<AssistantPanel active caseId="case_1" />),
       renderToStaticMarkup(
         <CaseCard
           summary={toSummary(row)}
@@ -339,58 +321,5 @@ describe("the notepad", () => {
     const html = renderToStaticMarkup(<NotesMarkdown text={"<img src=x onerror=alert(1)>"} />)
     expect(html).not.toContain("<img")
     expect(html).toContain("&lt;img")
-  })
-})
-
-describe("the assistant panel", () => {
-  it("says the assistant is a separate subscription, not a broken plan", () => {
-    // The exact failure this exists to prevent: a customer who had bought Heist
-    // AND the API add-on opened Investigations, read the web's bare "Quemly plan
-    // required", and concluded the purchase had failed.
-    const html = renderToStaticMarkup(<AssistantPanel active={false} caseId="case_1" />)
-    expect(html).toContain("separate subscription")
-    expect(html).toContain("Quemly")
-    expect(html).toMatch(/Nothing on your account is broken or missing/)
-    expect(html).toContain("API Access")
-    // Never the bare refusal the web shows.
-    expect(html).not.toContain("Quemly plan required")
-  })
-
-  it("does not repeat the sales pitch to somebody who already subscribes", () => {
-    const html = renderToStaticMarkup(<AssistantPanel active caseId="case_1" />)
-    expect(html).toContain("Your Quemly subscription is active")
-    expect(html).not.toContain("separate subscription")
-  })
-
-  it("points at the spelling of the Quemly host that actually resolves", () => {
-    // "quemly.swattedw.tf" is what the product name suggests and it does not
-    // exist. Sending someone there is a dead end at the exact moment they have
-    // been told where to go.
-    expect(QUEMLY_URL).toBe("https://qemuly.swattedw.tf")
-  })
-
-  it("links a case to its own page on the web, with the id escaped", () => {
-    expect(caseWebUrl("case_1")).toBe("https://swattedw.tf/dashboard/investigations/case_1")
-    expect(caseWebUrl("a b/../evil")).toBe(
-      "https://swattedw.tf/dashboard/investigations/a%20b%2F..%2Fevil",
-    )
-  })
-
-  it("offers both destinations only where each one helps", () => {
-    const locked = renderToStaticMarkup(<AssistantPanel active={false} caseId="case_1" />)
-    expect(locked).toContain("About Quemly")
-    expect(locked).toContain("Open this case on the web")
-    // A subscriber has nothing to read about: they already bought it.
-    const active = renderToStaticMarkup(<AssistantPanel active caseId="case_1" />)
-    expect(active).not.toContain("About Quemly")
-    expect(active).toContain("Open this case on the web")
-  })
-
-  it("opens every link in the browser, never in the webview", () => {
-    // Buttons rather than anchors, precisely so nothing can navigate the
-    // webview: every destination goes out through ipc.openExternal.
-    const html = renderToStaticMarkup(<AssistantPanel active={false} caseId="case_1" />)
-    expect(html).not.toContain("<a ")
-    expect(html).not.toContain("href=")
   })
 })

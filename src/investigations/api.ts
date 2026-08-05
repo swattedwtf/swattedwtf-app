@@ -110,26 +110,6 @@ export function toCase(raw: unknown): Case {
   }
 }
 
-/**
- * Whether the OSINT case assistant is available on this account.
- *
- * A SEPARATE subscription (Quemly) from the Swatted plan, which is the whole
- * reason this flag is carried at all: without it the screen cannot tell "you
- * have the assistant, it lives on the web" apart from "your plan is fine and
- * the assistant is sold separately", and a customer already read the second one
- * as their purchase being broken.
- *
- * Absent means "the server did not say", which is not the same as "no", so it
- * defaults to false and the copy that goes with false says what to do rather
- * than accusing the account of missing something.
- */
-export type Assistant = { active: boolean }
-
-export function toAssistant(raw: unknown): Assistant {
-  const a = withDefaults(raw, { active: false })
-  return { active: a.active === true }
-}
-
 /** The name rule, applied before the round trip. Null means "go ahead". */
 export function validateName(name: string): string | null {
   const trimmed = name.trim()
@@ -159,24 +139,22 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-/** What a list call answers with: the cases plus the assistant's availability. */
-export type CaseListPayload = { cases: CaseSummary[]; assistant: Assistant }
+/** What a list call answers with: the user's cases. */
+export type CaseListPayload = { cases: CaseSummary[] }
 
 export async function listCases(): Promise<CaseListPayload> {
   const payload = await ipc.investigations("list")
   const body = withDefaults(payload, {} as Record<string, unknown>)
   return {
     cases: list<unknown>(body.investigations).map(toSummary),
-    assistant: toAssistant(body.assistant),
   }
 }
 
-export async function openCase(id: string): Promise<{ investigation: Case; assistant: Assistant }> {
+export async function openCase(id: string): Promise<{ investigation: Case }> {
   const payload = await ipc.investigations("get", { id })
   const body = withDefaults(payload, {} as Record<string, unknown>)
   return {
     investigation: toCase(body.investigation),
-    assistant: toAssistant(body.assistant),
   }
 }
 

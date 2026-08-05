@@ -28,7 +28,7 @@ import { hasSeenWalkthrough } from "./lib/onboarding"
 import { Shell } from "./shell/Shell"
 import { CommandPalette } from "./shell/CommandPalette"
 import { WindowControls } from "./shell/WindowControls"
-import { resizeTo, watchMaximized } from "./shell/window"
+import { fadeOnClose, resizeTo, watchMaximized } from "./shell/window"
 import { isUnauthorized, messageOf } from "./lib/errors"
 import { ipc, type Overview } from "./lib/ipc"
 import "./theme.css"
@@ -126,6 +126,10 @@ export default function App() {
   }, [phase, overview])
 
   useEffect(() => watchMaximized(setMaximized), [])
+
+  // Fade the shell out before the window closes, from the close button, Alt+F4
+  // or the taskbar alike.
+  useEffect(() => fadeOnClose(), [])
 
   const handleAuthenticated = useCallback(() => {
     // Drop any stale payload so the reveal fetches for the account that just
