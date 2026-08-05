@@ -1,3 +1,4 @@
+import { Link2, Mail, Music2, Phone } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, withDefaults } from "./safe"
@@ -565,6 +566,8 @@ export const descriptor: ModuleDescriptor = {
   id: "tiktok",
   route: "/tiktok",
   label: "TikTok",
+  icon: Music2,
+  description: "Look up TikTok profiles by username or handle.",
   inputs: [
     {
       name: "query",
@@ -589,6 +592,8 @@ export const shareDescriptor: ModuleDescriptor = {
   id: "tiktok-share",
   route: "/tiktok/share-resolver",
   label: "TikTok share link",
+  icon: Link2,
+  description: "Expand a TikTok share/short link to reveal the user, video and share metadata.",
   inputs: [
     {
       // The server reads `url` here, not `query`.
@@ -611,6 +616,8 @@ export const phoneDescriptor: ModuleDescriptor = {
   id: "tiktok-phone",
   route: "/tiktok/phone",
   label: "TikTok phone to user",
+  icon: Phone,
+  description: "Resolve a phone number to the TikTok account registered against it.",
   inputs: [
     {
       name: "query",
@@ -632,6 +639,8 @@ export const emailDescriptor: ModuleDescriptor = {
   id: "tiktok-email",
   route: "/tiktok/email",
   label: "TikTok email to user",
+  icon: Mail,
+  description: "Resolve an email address to the TikTok account registered against it.",
   inputs: [
     {
       name: "query",

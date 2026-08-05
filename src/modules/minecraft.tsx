@@ -1,3 +1,4 @@
+import { Blocks } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { rows, withDefaults } from "./safe"
@@ -189,6 +190,8 @@ export const descriptor: ModuleDescriptor = {
   id: "minecraft",
   route: "/minecraft",
   label: "Minecraft",
+  icon: Blocks,
+  description: "Search by username, UUID, email or IP to resolve profiles, avatars, and linked intel.",
   inputs: [
     {
       name: "query",

@@ -2,8 +2,9 @@ import { useState, type ReactNode } from "react"
 
 import { classifyError, type ClassifiedError } from "../lib/errors"
 import { ipc, type LookupResult } from "../lib/ipc"
+import { PageHeader } from "./PageHeader"
 import { PLANS_URL } from "./ui/LockedSection"
-import type { InputField, ModuleDescriptor } from "./types"
+import type { InputField, ModuleDescriptor, PageIcon } from "./types"
 
 /**
  * The one screen every lookup module is rendered on.
@@ -79,10 +80,13 @@ export function SubmitButton({
   busy,
   onClick,
   label = "Search",
+  pill = false,
 }: {
   busy: boolean
   onClick: () => void
   label?: string
+  /** Full-radius, for the web-matching single-input search bar. */
+  pill?: boolean
 }) {
   return (
     <button
@@ -90,10 +94,74 @@ export function SubmitButton({
       disabled={busy}
       aria-busy={busy || undefined}
       onClick={onClick}
-      className="btn-primary shrink-0"
+      className={`btn-primary shrink-0${pill ? " is-pill px-6" : ""}`}
     >
       {label}
     </button>
+  )
+}
+
+/**
+ * The single-input search bar, matching the web's lookup pages: a full-radius
+ * field carrying the module's own icon on the left and a pill submit beside it,
+ * with the validation message underneath. Multi-field modules keep the stacked
+ * card in ModuleScreen; this is only the one-input case.
+ */
+function SearchBar({
+  field,
+  icon: Icon,
+  id,
+  value,
+  error,
+  busy,
+  onChange,
+  onSubmit,
+}: {
+  field: InputField
+  icon?: PageIcon
+  id: string
+  value: string
+  error?: string
+  busy: boolean
+  onChange: (v: string) => void
+  onSubmit: () => void
+}) {
+  return (
+    <div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSubmit()
+        }}
+        className="flex flex-col gap-2 sm:flex-row sm:items-center"
+      >
+        <div className="relative min-w-0 flex-1">
+          {Icon ? (
+            <Icon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
+          ) : null}
+          <input
+            id={id}
+            name={field.name}
+            value={value}
+            placeholder={field.placeholder}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={error ? true : undefined}
+            aria-label={field.label}
+            onChange={(e) => onChange(e.target.value)}
+            className={`glass-input is-pill h-11 w-full select-text pr-4 text-sm outline-none ${
+              Icon ? "pl-11" : "pl-4"
+            }`}
+          />
+        </div>
+        <SubmitButton busy={busy} onClick={onSubmit} pill />
+      </form>
+      {error ? (
+        <p role="alert" className="mt-2 pl-1 text-xs text-[var(--color-destructive)]">
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -288,31 +356,42 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <h1 className="text-3xl font-semibold tracking-tight">{descriptor.label}</h1>
+      <PageHeader icon={descriptor.icon} title={descriptor.label} description={descriptor.description} />
 
-      {/* One field takes the button on its own row; several stack above it,
-          because a row of seven inputs and a button is unreadable at this
-          window width. A module with no inputs at all is the button alone. */}
-      <div className="glass">
-        <div className="glass-body">
-          <div data-layout={inline ? "inline" : "stacked"} className={inline ? "" : "space-y-4"}>
-            {inline ? (
-              descriptor.inputs[0] ? (
-                renderField(descriptor.inputs[0], button)
-              ) : (
-                button
-              )
-            ) : (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {descriptor.inputs.map((field) => renderField(field))}
-                </div>
-                {button}
-              </>
-            )}
+      {/* A single-input module is the web's rounded search bar: the module's own
+          icon inside a full-radius field, then a pill submit, with no card
+          around it. Several inputs still stack inside a glass card, because a
+          row of seven pill fields is unreadable at this window width. A module
+          with no inputs at all is the button alone. */}
+      {inline ? (
+        descriptor.inputs[0] ? (
+          <SearchBar
+            field={descriptor.inputs[0]}
+            icon={descriptor.icon}
+            id={`${descriptor.id}-${descriptor.inputs[0].name}`}
+            value={values[descriptor.inputs[0].name] ?? ""}
+            error={errors[descriptor.inputs[0].name]}
+            busy={busy}
+            onChange={(v) =>
+              setValues((prev) => ({ ...prev, [descriptor.inputs[0].name]: v }))
+            }
+            onSubmit={() => void submit()}
+          />
+        ) : (
+          button
+        )
+      ) : (
+        <div className="glass">
+          <div className="glass-body">
+            <div data-layout="stacked" className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {descriptor.inputs.map((field) => renderField(field))}
+              </div>
+              {button}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {outcome.status === "failed" ? (
         <OutcomePanel outcome={outcome.error} onRetry={() => void submit()} />

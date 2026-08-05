@@ -1,9 +1,9 @@
 import { useState } from "react"
 import {
+  BellRing,
   Bot,
   ExternalLink,
   FolderSearch,
-  Radar,
   ScanFace,
   Search,
   Tag,
@@ -65,10 +65,10 @@ type Action = {
 
 const ACTIONS: Action[] = [
   { label: "Search", route: "/search", url: `${BASE}/search`, icon: Search },
-  // Replaces the old "Modules" tile, which pointed at a web index page that the
-  // sidebar already is. Live Intelligence is a real screen and a better second
-  // stop than a list of links.
-  { label: "Live Intelligence", route: "/live-intelligence", url: `${BASE}/live-intelligence`, icon: Radar },
+  // Monitor rather than Live Intelligence here: Live Intelligence already has a
+  // sidebar row and a dashboard tile duplicated it, so this slot points at
+  // Monitor (watchlists / alerts), a native screen users reach far less often.
+  { label: "Monitor", route: "/monitor", url: `${BASE}/monitor`, icon: BellRing },
   { label: "Investigations", route: "/investigations", url: `${BASE}/investigations`, icon: FolderSearch },
   { label: "Reverse Face", route: "/face", url: `${BASE}/face`, icon: ScanFace },
   { label: "Plans", route: "/plans", url: `${BASE}/plans`, icon: Tag },

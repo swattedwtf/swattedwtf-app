@@ -327,16 +327,26 @@ describe("ModuleScreen", () => {
     expect(html).toContain('placeholder="beta"')
   })
 
-  it("gives each field an id its label points at", () => {
+  it("labels a single-input search bar so the field still has an accessible name", () => {
+    // The web's lookup pages put no visible <label> on the one-field search bar;
+    // the field's name comes from aria-label instead. Multi-field forms keep the
+    // visible label pointing at its input (checked below).
     const html = renderToStaticMarkup(<ModuleScreen descriptor={digits} />)
     expect(html).toContain('id="discord-userId"')
-    expect(html).toContain('for="discord-userId"')
+    expect(html).toContain('aria-label="User ID"')
   })
 
-  it("puts the button beside a single field and below several", () => {
-    expect(renderToStaticMarkup(<ModuleScreen descriptor={digits} />)).toContain(
-      'data-layout="inline"',
-    )
+  it("gives each stacked field an id its label points at", () => {
+    const html = renderToStaticMarkup(<ModuleScreen descriptor={two} />)
+    expect(html).toContain('id="scraper-a"')
+    expect(html).toContain('for="scraper-a"')
+  })
+
+  it("makes a single field a search bar and several a stacked card", () => {
+    const single = renderToStaticMarkup(<ModuleScreen descriptor={digits} />)
+    // The rounded search bar, no card wrapper.
+    expect(single).toContain("glass-input is-pill")
+    expect(single).not.toContain('data-layout="stacked"')
     expect(renderToStaticMarkup(<ModuleScreen descriptor={two} />)).toContain(
       'data-layout="stacked"',
     )

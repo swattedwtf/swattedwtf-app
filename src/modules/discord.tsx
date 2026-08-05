@@ -1,3 +1,4 @@
+import { MessageCircle } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, rows, withDefaults } from "./safe"
@@ -271,6 +272,8 @@ export const descriptor: ModuleDescriptor = {
   id: "discord",
   route: "/discord",
   label: "Discord",
+  icon: MessageCircle,
+  description: "Resolve Discord users into profiles, servers, and connected intel.",
   inputs: [
     {
       name: "userId",

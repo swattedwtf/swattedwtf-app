@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { classifyError, type ClassifiedError } from "../lib/errors"
 import { startStream, type StreamFrame, type StreamHandle } from "../lib/ipc"
 import { OutcomePanel, SubmitButton, validateAll } from "./ModuleScreen"
+import { PageHeader } from "./PageHeader"
 import type { StreamModuleDescriptor, StreamStatus } from "./stream-types"
 
 /**
@@ -175,7 +176,7 @@ export function StreamScreen({ descriptor }: { descriptor: StreamModuleDescripto
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <h1 className="text-3xl font-semibold tracking-tight">{descriptor.label}</h1>
+      <PageHeader icon={descriptor.icon} title={descriptor.label} description={descriptor.description} />
 
       <div className="glass">
         <div className="glass-body space-y-4">

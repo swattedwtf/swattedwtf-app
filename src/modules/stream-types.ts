@@ -1,5 +1,5 @@
 import type { ReactElement } from "react"
-import type { InputField } from "./types"
+import type { InputField, PageIcon } from "./types"
 
 /**
  * Descriptors for the STREAMING screens (Search, Live Intelligence).
@@ -52,6 +52,9 @@ export type StreamModuleDescriptor = {
   route: string
   /** Heading, and the label the nav row already uses. */
   label: string
+  /** Optional page-header icon and description, matching the web (see ModuleDescriptor). */
+  icon?: PageIcon
+  description?: string
   inputs: InputField[]
   /** Optional mode toggle. The first mode is the default. */
   modes?: StreamMode[]

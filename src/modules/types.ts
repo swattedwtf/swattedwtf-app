@@ -1,4 +1,7 @@
-import type { ReactElement } from "react"
+import type { ComponentType, ReactElement } from "react"
+
+/** A page-header icon: any component taking an optional className (lucide fits). */
+export type PageIcon = ComponentType<{ className?: string }>
 
 /**
  * One field of a module's query.
@@ -50,6 +53,14 @@ export type ModuleDescriptor = {
   route: string
   /** Heading, and the label the nav row already uses. */
   label: string
+  /**
+   * Optional page-header icon and one-line description, mirroring the web's
+   * icon + title + description header on every dashboard page. When both are
+   * absent the screen falls back to the bare title, so an un-annotated module
+   * still renders.
+   */
+  icon?: PageIcon
+  description?: string
   inputs: InputField[]
   Result: (props: ResultProps) => ReactElement | null
 }

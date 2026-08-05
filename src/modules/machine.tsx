@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { HardDrive } from "lucide-react"
 
 import { ipc } from "../lib/ipc"
 import { list, withDefaults } from "./safe"
@@ -361,6 +362,8 @@ export const descriptor: ModuleDescriptor = {
   id: "machine",
   route: "/machine",
   label: "Machine Browser",
+  icon: HardDrive,
+  description: "Look up infected-machine profiles and captured data from stealer logs.",
   inputs: [
     {
       name: "query",

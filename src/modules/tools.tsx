@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Database, MapPinHouse, Radar, ShieldAlert, Smartphone, Users } from "lucide-react"
 
 import { copyText } from "../lib/clipboard"
 import { ipc } from "../lib/ipc"
@@ -404,6 +405,8 @@ export const samsungDescriptor: ModuleDescriptor = {
   id: "samsung",
   route: "/tools/samsung",
   label: "Samsung Lookup",
+  icon: Smartphone,
+  description: "Reverse-lookup a person by name and country, direct or date-of-birth enumeration.",
   // Mirrors the server's `validate()`. A per-field validator cannot see the
   // other fields, so the cross-field rules (a sweep needs start <= end) stay
   // with the server, which is the authority in any case.
@@ -701,6 +704,8 @@ export const skiptracerDescriptor: ModuleDescriptor = {
   id: "skiptracer",
   route: "/tools/skiptracer",
   label: "Skiptracer",
+  icon: Users,
+  description: "People and property records. Fill any fields to search by name, email, phone, or address.",
   /**
    * Every field is optional on its own, exactly as the server has it: the search
    * runs on whichever of the four query kinds were filled in.
@@ -1269,6 +1274,8 @@ export const addressInsightsDescriptor: ModuleDescriptor = {
   id: "address-insights",
   route: "/tools/address-insights",
   label: "Address Insights",
+  icon: MapPinHouse,
+  description: "Map every resident and property record tied to a street address.",
   // The server requires both, and refuses either alone.
   inputs: [
     {
@@ -1477,6 +1484,8 @@ export const falconDescriptor: ModuleDescriptor = {
   id: "falcon",
   route: "/tools/falcon",
   label: "Falcon",
+  icon: Radar,
+  description: "Identity aggregate: usernames, names, locations, and linked profiles from an email or phone.",
   inputs: [
     {
       name: "query_type",
@@ -1614,6 +1623,8 @@ export const intelxDescriptor: ModuleDescriptor = {
   id: "intelx",
   route: "/tools/intelx",
   label: "IntelX",
+  icon: Database,
+  description: "Fetch a leaked file's contents by its IntelX system ID.",
   inputs: [
     {
       name: "systemId",
@@ -2034,6 +2045,8 @@ export const cobraDescriptor: ModuleDescriptor = {
   id: "cobra",
   route: "/tools/cobra",
   label: "Cobra",
+  icon: ShieldAlert,
+  description: "Email-exposure intelligence: risk, linked accounts, domain reputation, and breaches.",
   /**
    * Email, phone and IP are each optional, and the server needs at least one of
    * them; country and postal are filters that cannot identify anyone on their

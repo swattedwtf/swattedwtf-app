@@ -1,3 +1,4 @@
+import { Phone, Send } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { list, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
@@ -168,6 +169,8 @@ export const userDescriptor: ModuleDescriptor = {
   id: "telegram",
   route: "/telegram",
   label: "Telegram",
+  icon: Send,
+  description: "Look up a Telegram account by @username or numeric ID.",
   inputs: [
     {
       name: "query",
@@ -193,6 +196,8 @@ export const phoneDescriptor: ModuleDescriptor = {
   id: "telegram-phone",
   route: "/telegram/phone",
   label: "Telegram phone lookup",
+  icon: Phone,
+  description: "Resolve a phone number to the linked Telegram account.",
   inputs: [
     {
       // The route's body key is `phone`, not `query`.

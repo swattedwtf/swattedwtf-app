@@ -319,7 +319,7 @@ function PlatformGroup({
         <NavIcon
           href={item.href}
           brand
-          className={`h-4 w-4 shrink-0 ${anyLive ? "opacity-80 transition-opacity group-hover:opacity-100" : ""}`}
+          className={`h-4 w-4 shrink-0 ${anyLive ? "text-white opacity-90 transition-opacity group-hover:opacity-100" : ""}`}
         />
         {collapsed ? null : (
           <>
@@ -394,7 +394,7 @@ function Row({
         onClick={() => void ipc.openExternal(item.href).catch(() => {})}
         className={`group flex w-full items-center gap-2.5 rounded-md py-1.5 text-left text-[13px] text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white ${pad}`}
       >
-        <NavIcon href={item.href} brand={brand} className="h-4 w-4 shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+        <NavIcon href={item.href} brand={brand} className="h-4 w-4 shrink-0 text-white opacity-90 transition-opacity group-hover:opacity-100" />
         {collapsed ? null : (
           <>
             <span className="truncate">{item.label}</span>
@@ -430,19 +430,23 @@ function Row({
       onClick={() => onNavigate(item.href)}
       title={collapsed ? item.label : undefined}
       aria-current={active ? "page" : undefined}
-      className={`group relative flex w-full items-center gap-2.5 rounded-md py-1.5 text-left text-[13px] transition-colors ${
+      className={`group relative flex w-full items-center gap-2.5 rounded-md text-left text-[13px] transition-colors ${
+        collapsed ? "py-2" : "py-1.5"
+      } ${
         active
           ? "bg-gradient-to-r from-white/[0.10] to-white/[0.02] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
           : "text-white/60 hover:bg-white/[0.05] hover:text-white"
       } ${pad}`}
     >
-      {active && (
+      {/* Collapsed, the far-left bar sits detached from a centred icon, so the
+          background pill carries the active state there and the bar is dropped. */}
+      {active && !collapsed && (
         <span className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-white shadow-[0_0_8px_0_rgba(255,255,255,0.5)]" />
       )}
       <NavIcon
         href={item.href}
         brand={brand}
-        className={`h-4 w-4 shrink-0 transition-opacity ${active ? "opacity-100" : "opacity-70 group-hover:opacity-100"}`}
+        className={`h-4 w-4 shrink-0 text-white transition-opacity ${active ? "opacity-100" : "opacity-90 group-hover:opacity-100"}`}
       />
       {collapsed ? null : <span className="truncate">{item.label}</span>}
     </button>

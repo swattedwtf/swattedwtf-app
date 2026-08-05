@@ -1,3 +1,4 @@
+import { Camera, Link2 } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, withDefaults } from "./safe"
@@ -487,6 +488,8 @@ export const descriptor: ModuleDescriptor = {
   id: "instagram",
   route: "/instagram",
   label: "Instagram",
+  icon: Camera,
+  description: "Resolve an Instagram username to its profile, past usernames, posts, stories, and highlights.",
   inputs: [
     {
       name: "query",
@@ -503,6 +506,8 @@ export const shareDescriptor: ModuleDescriptor = {
   id: "instagram-share",
   route: "/instagram/share-resolver",
   label: "Instagram share resolver",
+  icon: Link2,
+  description: "Expand an Instagram share link to reveal the author, media IDs and exact post time.",
   inputs: [
     {
       name: "url",

@@ -1,3 +1,4 @@
+import { Boxes, Layers } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, rows, withDefaults } from "./safe"
@@ -468,6 +469,8 @@ export const descriptor: ModuleDescriptor = {
   id: "roblox",
   route: "/roblox",
   label: "Roblox",
+  icon: Boxes,
+  description: "Resolve Roblox accounts into profiles, groups, badges, and connected intel.",
   inputs: [
     {
       name: "query",
@@ -630,6 +633,8 @@ export const scraperDescriptor: ModuleDescriptor = {
   id: "roblox-scraper",
   route: "/roblox/scraper",
   label: "Roblox Profile Scraper",
+  icon: Layers,
+  description: "Aggregate Roblox profiles in bulk with set preferences.",
   // Values are sent as strings, so the two toggles are the literal strings
   // "true" and "false". Every field mirrors the server's own validate() bounds
   // so an input that cannot succeed never becomes a metered scan.

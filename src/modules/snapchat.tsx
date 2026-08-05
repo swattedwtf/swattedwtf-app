@@ -1,3 +1,4 @@
+import { Ghost, Mail, Phone } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, withDefaults } from "./safe"
@@ -211,6 +212,8 @@ export const descriptor: ModuleDescriptor = {
   id: "snapchat",
   route: "/snapchat",
   label: "Snapchat",
+  icon: Ghost,
+  description: "Look up a Snapchat profile by username.",
   inputs: [
     {
       name: "query",
@@ -243,6 +246,8 @@ export const emailDescriptor: ModuleDescriptor = {
   id: "snapchat",
   route: "/snapchat/email",
   label: "Snapchat email to user",
+  icon: Mail,
+  description: "Resolve an email address to the linked Snapchat account.",
   inputs: [
     {
       name: "query",
@@ -264,6 +269,8 @@ export const phoneDescriptor: ModuleDescriptor = {
   id: "snapchat",
   route: "/snapchat/phone",
   label: "Snapchat phone to user",
+  icon: Phone,
+  description: "Resolve a phone number to the linked Snapchat account.",
   inputs: [
     {
       name: "query",

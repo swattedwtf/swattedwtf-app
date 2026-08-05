@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react"
+import { Fingerprint } from "lucide-react"
 
 import { ipc } from "../../lib/ipc"
 import { list } from "../safe"
@@ -240,6 +241,9 @@ export const liveIntelligenceDescriptor: StreamModuleDescriptor = {
   id: "live-intelligence",
   route: "/live-intelligence",
   label: "Live Intelligence",
+  icon: Fingerprint,
+  description:
+    "Reveal where an email or phone number is registered across 50+ platforms, with recovery hints and account details.",
   // The two tabs, mirroring the web page. The mode toggle picks which sweep the
   // server runs; each is metered as its own web route through its own module.
   modes: [

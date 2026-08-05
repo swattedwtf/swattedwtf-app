@@ -12,6 +12,8 @@ import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
 import { ModuleScreen } from "./modules/ModuleScreen"
 import { StreamScreen } from "./modules/StreamScreen"
+import { SearchScreen } from "./modules/streams/SearchScreen"
+import { LiveIntelScreen } from "./modules/streams/LiveIntelScreen"
 import { ApiAccess } from "./modules/api-access"
 import { Plans } from "./modules/plans"
 import { FaceScreen } from "./modules/face"
@@ -24,6 +26,7 @@ import { Settings } from "./settings/Settings"
 import { Walkthrough } from "./onboarding/Walkthrough"
 import { hasSeenWalkthrough } from "./lib/onboarding"
 import { Shell } from "./shell/Shell"
+import { CommandPalette } from "./shell/CommandPalette"
 import { WindowControls } from "./shell/WindowControls"
 import { resizeTo, watchMaximized } from "./shell/window"
 import { isUnauthorized, messageOf } from "./lib/errors"
@@ -236,9 +239,22 @@ export default function App() {
       return (
         <>
           {showWalkthrough && <Walkthrough onDone={() => setShowWalkthrough(false)} />}
+          {/* Ctrl/Cmd-K launcher, available over every screen. */}
+          <CommandPalette onNavigate={setRoute} />
           <Shell route={route} onNavigate={setRoute}>
             {module ? (
               <ModuleScreen descriptor={module} />
+            ) : route === "/search" ? (
+              // Search owns a bespoke hero screen (matching the web's centred
+              // composer + Browse Modules card) rather than the generic stream
+              // form. Checked before the streamModule branch so searchDescriptor
+              // still backs it (resolve/Result) without rendering StreamScreen.
+              <SearchScreen onNavigate={setRoute} />
+            ) : route === "/live-intelligence" ? (
+              // Live Intelligence likewise owns a bespoke screen: the web's
+              // centred underline tabs + centred input, not StreamScreen's
+              // left-aligned pills. Backed by the same descriptor (resolve/Result).
+              <LiveIntelScreen />
             ) : streamModule ? (
               <StreamScreen descriptor={streamModule} />
             ) : route === "/api" ? (
