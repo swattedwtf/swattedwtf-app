@@ -33,13 +33,17 @@ export async function resizeTo(which: keyof typeof SIZES): Promise<void> {
  * Fades the window out before it actually closes.
  *
  * The custom close button, Alt+F4 and the taskbar all funnel through
- * `onCloseRequested`. The first request is intercepted: the shell is given a
- * fade class and the real close fires once the animation has run. A `closing`
- * latch lets that second close through untouched, so there is no loop and no
- * dependency on an allow-destroy permission the app deliberately does not grant.
+ * `onCloseRequested`. The first request is intercepted: the shell gets a fade
+ * class, and once the animation has run the window is DESTROYED.
  *
- * Guarded like everything else here: outside a Tauri host it does nothing and
- * the window (if any) closes instantly.
+ * `destroy()`, not a second `close()`. A prevented close followed by another
+ * `close()` re-enters this very handler and, on Windows/WebView2, leaves the
+ * window prevented-but-never-torn-down: it fades to a blank frame and can only
+ * be killed from Task Manager. `destroy()` tears the window down directly and
+ * never re-emits onCloseRequested, so there is no loop and no hang. It needs
+ * `core:window:allow-destroy`, which the capability now grants. A `closing`
+ * latch still guards against any second request arriving before teardown, and
+ * a hard fallback timer guarantees the window leaves even if destroy is refused.
  */
 export function fadeOnClose(durationMs = 190): () => void {
   let stop: (() => void) | undefined
@@ -50,11 +54,16 @@ export function fadeOnClose(durationMs = 190): () => void {
     try {
       const win = getCurrentWindow()
       const unlisten = await win.onCloseRequested((event) => {
-        if (closing) return // second pass: let the real close proceed
+        if (closing) return
         closing = true
         event.preventDefault()
         document.documentElement.classList.add("app-closing")
-        setTimeout(() => void win.close().catch(() => {}), durationMs)
+        setTimeout(() => {
+          // destroy() is the one that actually closes. If it is somehow
+          // refused, fall back to close() so the window still leaves rather
+          // than stranding the user on a blank frame.
+          void win.destroy().catch(() => void win.close().catch(() => {}))
+        }, durationMs)
       })
       if (cancelled) unlisten()
       else stop = unlisten
