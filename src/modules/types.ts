@@ -26,6 +26,14 @@ export type InputField = {
    * test rather than by the product.
    */
   optional?: boolean
+  /**
+   * A fixed set of choices, rendered as a segmented toggle instead of a text
+   * box (the web's Falcon Email/Phone selector). When set, `defaultValue`
+   * should name the option selected first; the value is always one of these.
+   */
+  options?: { value: string; label: string }[]
+  /** The value the field starts on, e.g. the default toggle option. */
+  defaultValue?: string
   validate(v: string): string | null
 }
 
@@ -60,6 +68,13 @@ export type ModuleDescriptor = {
    * still renders.
    */
   icon?: PageIcon
+  /**
+   * A brand logo for the page header, e.g. "/brand/discord.svg". Takes
+   * precedence over `icon` when both are set: the platform pages want their real
+   * mark, not a lucide stand-in, and `icon` stays as the fallback if the asset
+   * is ever missing.
+   */
+  brandSrc?: string
   description?: string
   inputs: InputField[]
   Result: (props: ResultProps) => ReactElement | null

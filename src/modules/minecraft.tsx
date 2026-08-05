@@ -191,6 +191,7 @@ export const descriptor: ModuleDescriptor = {
   route: "/minecraft",
   label: "Minecraft",
   icon: Blocks,
+  brandSrc: "/brand/minecraft.svg",
   description: "Search by username, UUID, email or IP to resolve profiles, avatars, and linked intel.",
   inputs: [
     {

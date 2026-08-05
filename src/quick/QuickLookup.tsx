@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { CornerDownLeft, Search } from "lucide-react"
 
 import { ipc } from "../lib/ipc"
-import { KIND_LABEL, identify, targetUrl } from "./identify"
+import { KIND_LABEL, identify, targetRoute, targetUrl } from "./identify"
 import "../theme.css"
 
 /** Longest input worth accepting. Nothing we can look up is near this. */
@@ -70,10 +70,18 @@ export function QuickLookup() {
     if (!match || busy) return
     setBusy(true)
     try {
-      await ipc.openExternal(targetUrl(match))
+      const inApp = targetRoute(match)
+      if (inApp) {
+        // Resolve inside the app: the main window navigates to the module and
+        // runs the lookup. Only kinds with no native screen (an IP) fall back
+        // to opening the web dashboard.
+        await ipc.resolveQuick(inApp.route, inApp.query, inApp.mode)
+      } else {
+        await ipc.openExternal(targetUrl(match))
+      }
       dismiss()
     } catch {
-      // Blocked or the opener failed. Keep the bar up rather than vanishing
+      // Blocked or the handoff failed. Keep the bar up rather than vanishing
       // with no result, so the user knows nothing happened.
     } finally {
       setBusy(false)

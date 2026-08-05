@@ -11,7 +11,7 @@ use crate::error::AppError;
 use crate::settings::SettingsState;
 use crate::shortcut::{self, ShortcutOutcome};
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct AppState {
     pub client: ApiClient,
@@ -54,6 +54,11 @@ pub async fn register(
 #[tauri::command]
 pub async fn logout(state: State<'_, AppState>) -> Result<(), AppError> {
     auth::logout(&state.client).await
+}
+
+#[tauri::command]
+pub async fn accept_legal(state: State<'_, AppState>) -> Result<(), AppError> {
+    auth::accept_legal(&state.client).await
 }
 
 #[tauri::command]
@@ -406,6 +411,29 @@ pub async fn save_recovery_file(app: AppHandle, code: String) -> Result<Option<S
 /// show rather than a webview boot.
 #[tauri::command]
 pub async fn hide_quick(app: AppHandle) -> Result<(), AppError> {
+    crate::quick::hide(&app);
+    Ok(())
+}
+
+/// Hands a resolved identifier from the overlay to the MAIN window, which
+/// navigates to `route` and runs the lookup for `query`, then takes focus while
+/// the overlay hides. This keeps the lookup inside the app instead of opening
+/// the web dashboard. The main window's App listens for `quick-resolve`.
+#[tauri::command]
+pub async fn resolve_quick(
+    app: AppHandle,
+    route: String,
+    query: String,
+    mode: Option<String>,
+) -> Result<(), AppError> {
+    let _ = app.emit(
+        "quick-resolve",
+        serde_json::json!({ "route": route, "query": query, "mode": mode }),
+    );
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
     crate::quick::hide(&app);
     Ok(())
 }

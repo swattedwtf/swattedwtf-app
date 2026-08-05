@@ -978,11 +978,15 @@ textarea:focus-visible {
   height: 100%;
   padding: 1px;
   border-radius: 16px;
+  /* The same restrained gradient-hairline frame the dashboard panels use, not
+     the loud near-white rim this had before. That rim was the "white outline"
+     that made the overlay read as a different, brighter component than the rest
+     of the app. */
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0.07) 40%,
-    rgba(255, 255, 255, 0.03) 100%
+    rgba(255, 255, 255, 0.13) 0%,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.02) 100%
   );
   box-shadow: 0 32px 80px -24px rgba(0, 0, 0, 0.95);
 }
@@ -994,12 +998,15 @@ textarea:focus-visible {
   flex-direction: column;
   overflow: hidden;
   border-radius: 15px;
-  background: linear-gradient(180deg, rgba(19, 19, 19, 0.9), rgba(9, 9, 9, 0.93));
+  /* Near-black, matching the app's glass panels, rather than the lighter grey
+     this used, so the overlay is recognisably the same material. */
+  background: linear-gradient(180deg, rgba(13, 13, 13, 0.92), rgba(7, 7, 7, 0.95));
   backdrop-filter: blur(30px) saturate(1.7) brightness(1.04);
 }
 
 /* Specular highlight along the top edge, inset from the corners so it reads as
-   light catching a bevel rather than as a second border. */
+   light catching a bevel rather than as a second border. Softened to match the
+   panels. */
 .quick-body::before {
   content: "";
   position: absolute;
@@ -1007,7 +1014,7 @@ textarea:focus-visible {
   right: 22px;
   top: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.20), transparent);
 }
 
 .quick-body::after {

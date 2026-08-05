@@ -567,6 +567,7 @@ export const descriptor: ModuleDescriptor = {
   route: "/tiktok",
   label: "TikTok",
   icon: Music2,
+  brandSrc: "/brand/tiktok.svg",
   description: "Look up TikTok profiles by username or handle.",
   inputs: [
     {
@@ -593,6 +594,7 @@ export const shareDescriptor: ModuleDescriptor = {
   route: "/tiktok/share-resolver",
   label: "TikTok share link",
   icon: Link2,
+  brandSrc: "/brand/tiktok.svg",
   description: "Expand a TikTok share/short link to reveal the user, video and share metadata.",
   inputs: [
     {
@@ -617,6 +619,7 @@ export const phoneDescriptor: ModuleDescriptor = {
   route: "/tiktok/phone",
   label: "TikTok phone to user",
   icon: Phone,
+  brandSrc: "/brand/tiktok.svg",
   description: "Resolve a phone number to the TikTok account registered against it.",
   inputs: [
     {
@@ -640,6 +643,7 @@ export const emailDescriptor: ModuleDescriptor = {
   route: "/tiktok/email",
   label: "TikTok email to user",
   icon: Mail,
+  brandSrc: "/brand/tiktok.svg",
   description: "Resolve an email address to the TikTok account registered against it.",
   inputs: [
     {

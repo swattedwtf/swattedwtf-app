@@ -170,6 +170,7 @@ export const userDescriptor: ModuleDescriptor = {
   route: "/telegram",
   label: "Telegram",
   icon: Send,
+  brandSrc: "/brand/telegram.svg",
   description: "Look up a Telegram account by @username or numeric ID.",
   inputs: [
     {
@@ -197,6 +198,7 @@ export const phoneDescriptor: ModuleDescriptor = {
   route: "/telegram/phone",
   label: "Telegram phone lookup",
   icon: Phone,
+  brandSrc: "/brand/telegram.svg",
   description: "Resolve a phone number to the linked Telegram account.",
   inputs: [
     {

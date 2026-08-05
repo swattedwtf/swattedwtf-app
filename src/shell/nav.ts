@@ -43,7 +43,10 @@ export const NAV: NavGroup[] = [
       { label: "Investigations", href: "/investigations" },
       { label: "Machine Browser", href: "/machine" },
       { label: "Reverse Face", href: "/face" },
-      { label: "Agent", href: "/agent" },
+      // The Agent is Quemly, a separate web product; the desktop has no native
+      // screen for it, so the row opens it in the browser rather than sitting
+      // disabled behind a "soon" pill.
+      { label: "Agent", href: "https://qemuly.swattedw.tf", external: true },
       { label: "Monitor", href: "/monitor" },
     ],
   },

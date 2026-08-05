@@ -42,7 +42,7 @@ describe("API Access screen", () => {
     // as a broken feature rather than as one that has not been bought. This is
     // the web's own wording, so the two pages say the same thing.
     const html = renderToStaticMarkup(<ApiAccess overview={overviewWith({ active: false })} />)
-    expect(html).toContain("/ API Access")
+    expect(html).toContain("API Access")
     expect(html).toContain("Programmatic access to every Swatted.wtf lookup")
     expect(html).toContain("No active API Access")
     expect(html).toContain("Subscribe to API Access to generate keys")

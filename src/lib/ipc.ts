@@ -10,6 +10,13 @@ export type Overview = {
   user: { id: string; userNumber: number; email: string | null; handle: string }
   telegram: { username: string | null; linked: boolean }
   security: { twofaEnabled: boolean }
+  /** True when the user has accepted the current legal-document version. The
+   *  app shows a consent modal on entry only when this is explicitly false, so
+   *  an older backend that omits it (or a fixture) never blocks. */
+  legalAccepted?: boolean
+  /** Public Mapbox token for the Address Insights interactive map. Null/absent
+   *  when the server has not shipped it, in which case the static still shows. */
+  mapboxToken?: string | null
   plan: {
     id: string
     label: string
@@ -176,9 +183,12 @@ export const ipc = {
   register: (email?: string) => invoke<RegisterOutcome>("register", { email }),
   saveRecoveryFile: (code: string) => invoke<string | null>("save_recovery_file", { code }),
   logout: () => invoke<void>("logout"),
+  acceptLegal: () => invoke<void>("accept_legal"),
   getOverview: () => invoke<Overview>("get_overview"),
   windowDiagnostics: () => invoke<WindowDiagnostics>("window_diagnostics"),
   hideQuick: () => invoke<void>("hide_quick"),
+  resolveQuick: (route: string, query: string, mode?: string) =>
+    invoke<void>("resolve_quick", { route, query, mode: mode ?? null }),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
 
   getSettings: () => invoke<SettingsView>("get_settings"),

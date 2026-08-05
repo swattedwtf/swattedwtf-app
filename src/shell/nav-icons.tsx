@@ -44,7 +44,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/investigations": FolderSearch,
   "/machine": HardDrive,
   "/face": ScanFace,
-  "/agent": Bot,
+  "https://qemuly.swattedw.tf": Bot,
   "/monitor": BellRing,
 
   // The platform rows normally render a brand mark (see BRAND below); these

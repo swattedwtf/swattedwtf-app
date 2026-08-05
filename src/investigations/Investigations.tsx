@@ -84,10 +84,7 @@ function Header({ subtitle }: { subtitle: string }) {
         <FolderSearch className="h-5 w-5 text-white" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-          / Investigations
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">Investigations</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Investigations</h1>
         <p className="mt-1 max-w-[70ch] text-sm text-white/70">{subtitle}</p>
       </div>
     </div>

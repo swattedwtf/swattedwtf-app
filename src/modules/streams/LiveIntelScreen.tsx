@@ -23,9 +23,16 @@ import { liveIntelligenceDescriptor } from "./live-intelligence"
 const MODES = liveIntelligenceDescriptor.modes ?? []
 const Result = liveIntelligenceDescriptor.Result
 
-export function LiveIntelScreen() {
-  const [query, setQuery] = useState("")
-  const [mode, setMode] = useState<string>(MODES[0]?.id ?? "email")
+export function LiveIntelScreen({
+  initial,
+  onPrefillConsumed,
+}: {
+  /** A query handed over from the quick-lookup overlay: run automatically. */
+  initial?: { query: string; mode?: string | null }
+  onPrefillConsumed?: () => void
+} = {}) {
+  const [query, setQuery] = useState(initial?.query ?? "")
+  const [mode, setMode] = useState<string>(initial?.mode ?? MODES[0]?.id ?? "email")
   const [error, setError] = useState<string | null>(null)
 
   const [status, setStatus] = useState<StreamStatus>("idle")
@@ -43,13 +50,13 @@ export function LiveIntelScreen() {
 
   useEffect(() => () => stop(), [stop])
 
-  const submit = useCallback(async () => {
-    const q = query.trim()
+  const run = useCallback(async (rawQuery: string, m: string) => {
+    const q = rawQuery.trim()
     if (!q) {
-      setError(mode === "phone" ? "Enter a phone number." : "Enter an email address.")
+      setError(m === "phone" ? "Enter a phone number." : "Enter an email address.")
       return
     }
-    const resolved = liveIntelligenceDescriptor.resolve({ query: q }, mode)
+    const resolved = liveIntelligenceDescriptor.resolve({ query: q }, m)
     if ("error" in resolved) {
       setError(resolved.error)
       return
@@ -98,7 +105,18 @@ export function LiveIntelScreen() {
       setRefusal(classifyError(err))
       setStatus("idle")
     }
-  }, [query, mode, stop])
+  }, [stop])
+
+  const submit = useCallback(() => void run(query, mode), [run, query, mode])
+
+  // A quick-lookup handoff runs itself once with the values it arrived with.
+  const didPrefill = useRef(false)
+  useEffect(() => {
+    if (didPrefill.current || !initial?.query) return
+    didPrefill.current = true
+    void run(initial.query, initial.mode ?? MODES[0]?.id ?? "email")
+    onPrefillConsumed?.()
+  }, [initial, run, onPrefillConsumed])
 
   const reset = useCallback(() => {
     stop()

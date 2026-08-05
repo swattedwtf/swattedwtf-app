@@ -6,6 +6,7 @@ import {
   Keyboard,
   Power,
   ShieldCheck,
+  User,
   Wallet,
 } from "lucide-react"
 import { ThemeSection } from "./ThemeSection"
@@ -25,22 +26,37 @@ const CAPTION =
   "font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]"
 const MUTED = "text-[var(--color-muted-foreground)]"
 
-/** One block of the screen, on the two-element panel material. */
+/** One block of the screen, on the two-element panel material.
+ *
+ * Header matches the web's settings cards: an icon in a soft tile, the title,
+ * and a one-line description, rather than the bare mono-caption the app used,
+ * which is what made the two sets of cards read as different products. */
 function Panel({
   title,
+  description,
   icon,
   children,
 }: {
   title: string
+  description?: string
   icon?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="glass">
       <div className="glass-body">
-        <div className="flex items-center gap-2">
-          {icon}
-          <h2 className={CAPTION}>{title}</h2>
+        <div className="flex items-start gap-3">
+          {icon ? (
+            <span className="glass-tile grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white">
+              {icon}
+            </span>
+          ) : null}
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold tracking-tight text-white">{title}</h2>
+            {description ? (
+              <p className={`mt-0.5 text-xs leading-relaxed ${MUTED}`}>{description}</p>
+            ) : null}
+          </div>
         </div>
         <div className="mt-4 space-y-3 text-sm">{children}</div>
       </div>
@@ -126,7 +142,11 @@ export function AccountSection({
   onLogout: () => void
 }) {
   return (
-    <Panel title="Account">
+    <Panel
+      title="Account"
+      description="Who you are, and the ways back into this account."
+      icon={<User className="h-4 w-4" aria-hidden="true" />}
+    >
       <Row label="Handle" value={overview.user.handle} />
       <Row label="User number" value={`#${overview.user.userNumber}`} />
       <Row label="Email" value={overview.user.email ?? "Not set"} />
@@ -172,7 +192,11 @@ export function PlanSection({ overview }: { overview: Overview }) {
     plan.monthlyLimit > 0 ? Math.min(100, (usage.monthCount / plan.monthlyLimit) * 100) : 0
 
   return (
-    <Panel title="Plan and usage" icon={<Wallet className="h-4 w-4 opacity-70" aria-hidden="true" />}>
+    <Panel
+      title="Plan and usage"
+      description="Your current tier, wallet balance and lookup limits."
+      icon={<Wallet className="h-4 w-4" aria-hidden="true" />}
+    >
       <Row label="Plan" value={plan.label} />
       {/* Shown verbatim, and only when the server reported one. An empty string
           is "the server did not say", which is not a status of its own. */}
@@ -297,7 +321,11 @@ export function ShortcutSection({
   const disabled = loaded && stored === null
 
   return (
-    <Panel title="Shortcuts" icon={<Keyboard className="h-4 w-4 opacity-70" aria-hidden="true" />}>
+    <Panel
+      title="Shortcuts"
+      description="The global hotkey that summons the quick-lookup bar."
+      icon={<Keyboard className="h-4 w-4" aria-hidden="true" />}
+    >
       <Row
         label="Quick lookup"
         value={
@@ -408,7 +436,11 @@ export function StartupSection({
   const enabled = view?.launchAtLogin ?? false
 
   return (
-    <Panel title="Startup" icon={<Power className="h-4 w-4 opacity-70" aria-hidden="true" />}>
+    <Panel
+      title="Startup"
+      description="How the app behaves when your computer starts."
+      icon={<Power className="h-4 w-4" aria-hidden="true" />}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p>Launch at login</p>
@@ -448,7 +480,8 @@ export function SecuritySection({ overview }: { overview: Overview }) {
   return (
     <Panel
       title="Security"
-      icon={<ShieldCheck className="h-4 w-4 opacity-70" aria-hidden="true" />}
+      description="Two-factor authentication for this account."
+      icon={<ShieldCheck className="h-4 w-4" aria-hidden="true" />}
     >
       <Row
         label="Two-factor authentication"
@@ -780,10 +813,7 @@ export function Settings({
   return (
     <div className="mx-auto w-full max-w-3xl pb-8">
       <header className="border-b border-white/[0.08] pb-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-          / Settings
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Settings</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Settings</h1>
         <p className="mt-1.5 text-sm text-[var(--color-muted-foreground)]">
           Manage your account, how the app behaves, and how it looks.
         </p>

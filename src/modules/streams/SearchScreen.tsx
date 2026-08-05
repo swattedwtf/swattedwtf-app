@@ -37,9 +37,18 @@ const MODES: { id: Mode; label: string; icon: typeof AtSign }[] = [
 // the tests assert against.
 const Result = searchDescriptor.Result
 
-export function SearchScreen({ onNavigate }: { onNavigate: (route: string) => void }) {
-  const [query, setQuery] = useState("")
-  const [mode, setMode] = useState<Mode>("email")
+export function SearchScreen({
+  onNavigate,
+  initial,
+  onPrefillConsumed,
+}: {
+  onNavigate: (route: string) => void
+  /** A query handed over from the quick-lookup overlay: run automatically. */
+  initial?: { query: string; mode?: string | null }
+  onPrefillConsumed?: () => void
+}) {
+  const [query, setQuery] = useState(initial?.query ?? "")
+  const [mode, setMode] = useState<Mode>((initial?.mode as Mode) ?? "email")
   // A shape the client can already reject (bad email, short username): shown
   // under the composer, never spent as a request.
   const [error, setError] = useState<string | null>(null)
@@ -64,13 +73,13 @@ export function SearchScreen({ onNavigate }: { onNavigate: (route: string) => vo
   // Cancel a live stream if the screen goes away.
   useEffect(() => () => stop(), [stop])
 
-  const submit = useCallback(async () => {
-    const q = query.trim()
+  const run = useCallback(async (rawQuery: string, m: Mode) => {
+    const q = rawQuery.trim()
     if (!q) {
       setError("Enter something to search for.")
       return
     }
-    const resolved = searchDescriptor.resolve({ query: q }, mode)
+    const resolved = searchDescriptor.resolve({ query: q }, m)
     if ("error" in resolved) {
       setError(resolved.error)
       return
@@ -120,7 +129,19 @@ export function SearchScreen({ onNavigate }: { onNavigate: (route: string) => vo
       setRefusal(classifyError(err))
       setStatus("idle")
     }
-  }, [query, mode, stop])
+  }, [stop])
+
+  const submit = useCallback(() => void run(query, mode), [run, query, mode])
+
+  // A quick-lookup handoff runs itself once, with the values it arrived with, so
+  // it never races the query/mode state it also seeds for display.
+  const didPrefill = useRef(false)
+  useEffect(() => {
+    if (didPrefill.current || !initial?.query) return
+    didPrefill.current = true
+    void run(initial.query, (initial.mode as Mode) ?? "email")
+    onPrefillConsumed?.()
+  }, [initial, run, onPrefillConsumed])
 
   const busy = status === "streaming"
   const active = status !== "idle"

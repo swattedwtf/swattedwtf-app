@@ -116,6 +116,13 @@ pub struct Api {
     pub key: Option<String>,
 }
 
+/// Serde default for `legal_accepted`: absent means the server has not shipped
+/// the field, which must NOT read as "not accepted" and strand the user behind
+/// an undismissable modal.
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Overview {
     pub user: User,
@@ -124,6 +131,17 @@ pub struct Overview {
     pub plan: Plan,
     pub usage: Usage,
     pub api: Api,
+    /// True when the user has accepted the current legal-document version. The
+    /// client shows a consent modal on entry when this is false. Defaulted to
+    /// TRUE so a server that has not shipped the field yet never blocks the user
+    /// behind a modal they cannot dismiss (fail open, exactly as the web only
+    /// gates once the version is known).
+    #[serde(rename = "legalAccepted", default = "default_true")]
+    pub legal_accepted: bool,
+    /// Public Mapbox token for the Address Insights interactive map. Absent on a
+    /// server that has not shipped it; the screen then shows the static still.
+    #[serde(rename = "mapboxToken", default)]
+    pub mapbox_token: Option<String>,
     /// The tier catalog, priced for this account. Defaulted so a server that
     /// has not shipped it yet still boots the app: the Plans screen then says
     /// the catalog is unavailable rather than the whole overview failing.

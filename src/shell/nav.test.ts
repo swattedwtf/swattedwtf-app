@@ -76,14 +76,15 @@ describe("isEnabled", () => {
     expect(isEnabled("/live-intelligence")).toBe(true)
   })
 
-  it("still disables every nav route that has no descriptor yet", () => {
+  it("disables any nav route that has neither a descriptor nor a built-in screen", () => {
     const live = new Set([...MODULES.map((m) => m.route), ...streamRoutes()])
     const unbuilt = flattenNav()
       .map((i) => i.href)
       .filter((h) => !live.has(h) && !BUILT_IN_ROUTES.includes(h) && !h.startsWith("http"))
-    // There are always some: the whole Tools group and several Intelligence
-    // screens (Investigations, Agent, Monitor, ...) are out of scope for this pass.
-    expect(unbuilt.length).toBeGreaterThan(0)
+    // Every remaining nav destination is now either built (a module, a stream or
+    // a built-in) or an external link (Agent, Support), so `unbuilt` may be
+    // empty; the guarantee under test is only that anything left in it is
+    // disabled, never that some route is still unbuilt.
     for (const href of unbuilt) expect(isEnabled(href), `${href} should be disabled`).toBe(false)
   })
 

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 
 import { classifyError, type ClassifiedError } from "../lib/errors"
 import { ipc, type LookupResult } from "../lib/ipc"
@@ -110,6 +110,7 @@ export function SubmitButton({
 function SearchBar({
   field,
   icon: Icon,
+  brandSrc,
   id,
   value,
   error,
@@ -119,6 +120,7 @@ function SearchBar({
 }: {
   field: InputField
   icon?: PageIcon
+  brandSrc?: string
   id: string
   value: string
   error?: string
@@ -136,7 +138,15 @@ function SearchBar({
         className="flex flex-col gap-2 sm:flex-row sm:items-center"
       >
         <div className="relative min-w-0 flex-1">
-          {Icon ? (
+          {brandSrc ? (
+            <img
+              src={brandSrc}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 opacity-80"
+            />
+          ) : Icon ? (
             <Icon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
           ) : null}
           <input
@@ -150,7 +160,7 @@ function SearchBar({
             aria-label={field.label}
             onChange={(e) => onChange(e.target.value)}
             className={`glass-input is-pill h-11 w-full select-text pr-4 text-sm outline-none ${
-              Icon ? "pl-11" : "pl-4"
+              brandSrc || Icon ? "pl-11" : "pl-4"
             }`}
           />
         </div>
@@ -278,8 +288,28 @@ export function ResultView({
   )
 }
 
-export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
-  const [values, setValues] = useState<Record<string, string>>({})
+export function ModuleScreen({
+  descriptor,
+  initialQuery,
+  onPrefillConsumed,
+}: {
+  descriptor: ModuleDescriptor
+  /** A query handed over from the quick-lookup overlay: seeds the first field
+   *  and runs automatically. */
+  initialQuery?: string
+  onPrefillConsumed?: () => void
+}) {
+  // Seed any field that ships a default (a toggle's starting option), so a
+  // segmented control renders selected from first paint rather than blank; and
+  // the first field with a quick-lookup query when one was handed over.
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {}
+    for (const field of descriptor.inputs) {
+      if (field.defaultValue != null) seed[field.name] = field.defaultValue
+    }
+    if (initialQuery && descriptor.inputs[0]) seed[descriptor.inputs[0].name] = initialQuery
+    return seed
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<Outcome>({ status: "idle" })
@@ -295,6 +325,17 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
   const [runId, setRunId] = useState(0)
 
   const inline = descriptor.inputs.length <= 1
+
+  // A quick-lookup handoff seeds the first field (above) and runs once on mount.
+  const didPrefill = useRef(false)
+  useEffect(() => {
+    if (didPrefill.current || !initialQuery) return
+    didPrefill.current = true
+    void submit()
+    onPrefillConsumed?.()
+    // Runs exactly once for the handed-over query; submit reads the seeded values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function submit() {
     if (busy) return
@@ -318,6 +359,41 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
   const renderField = (field: InputField, trailing?: ReactNode) => {
     const id = `${descriptor.id}-${field.name}`
     const error = errors[field.name]
+
+    // A fixed set of choices renders as a segmented toggle (Falcon's Email /
+    // Phone selector) rather than a text box you have to type the value into.
+    if (field.options) {
+      const current = values[field.name] ?? field.defaultValue ?? field.options[0]?.value
+      return (
+        <div key={field.name} className="min-w-0">
+          <label className="block font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
+            {field.label}
+          </label>
+          <div
+            role="radiogroup"
+            aria-label={field.label}
+            className="glass-tile mt-2 inline-flex items-center gap-1 rounded-full p-1"
+          >
+            {field.options.map((opt) => {
+              const on = current === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setValues((v) => ({ ...v, [field.name]: opt.value }))}
+                  className={on ? "btn-primary btn-compact" : "btn-secondary btn-compact"}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div key={field.name} className="min-w-0">
         <label
@@ -356,7 +432,12 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader icon={descriptor.icon} title={descriptor.label} description={descriptor.description} />
+      <PageHeader
+        icon={descriptor.icon}
+        brandSrc={descriptor.brandSrc}
+        title={descriptor.label}
+        description={descriptor.description}
+      />
 
       {/* A single-input module is the web's rounded search bar: the module's own
           icon inside a full-radius field, then a pill submit, with no card
@@ -368,6 +449,7 @@ export function ModuleScreen({ descriptor }: { descriptor: ModuleDescriptor }) {
           <SearchBar
             field={descriptor.inputs[0]}
             icon={descriptor.icon}
+            brandSrc={descriptor.brandSrc}
             id={`${descriptor.id}-${descriptor.inputs[0].name}`}
             value={values[descriptor.inputs[0].name] ?? ""}
             error={errors[descriptor.inputs[0].name]}

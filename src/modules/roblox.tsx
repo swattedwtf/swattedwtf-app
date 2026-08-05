@@ -470,6 +470,7 @@ export const descriptor: ModuleDescriptor = {
   route: "/roblox",
   label: "Roblox",
   icon: Boxes,
+  brandSrc: "/brand/roblox.svg",
   description: "Resolve Roblox accounts into profiles, groups, badges, and connected intel.",
   inputs: [
     {
@@ -634,6 +635,7 @@ export const scraperDescriptor: ModuleDescriptor = {
   route: "/roblox/scraper",
   label: "Roblox Profile Scraper",
   icon: Layers,
+  brandSrc: "/brand/roblox.svg",
   description: "Aggregate Roblox profiles in bulk with set preferences.",
   // Values are sent as strings, so the two toggles are the literal strings
   // "true" and "false". Every field mirrors the server's own validate() bounds

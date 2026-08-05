@@ -273,6 +273,7 @@ export const descriptor: ModuleDescriptor = {
   route: "/discord",
   label: "Discord",
   icon: MessageCircle,
+  brandSrc: "/brand/discord.svg",
   description: "Resolve Discord users into profiles, servers, and connected intel.",
   inputs: [
     {

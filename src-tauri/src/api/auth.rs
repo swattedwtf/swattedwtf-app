@@ -146,6 +146,17 @@ pub async fn logout(client: &ApiClient) -> Result<(), AppError> {
     client.forget()
 }
 
+/// Records the signed-in user's acceptance of the current legal-document
+/// version (POST /api/legal/accept). A non-2xx is surfaced as an AppError so the
+/// consent modal can show why it failed rather than silently staying open.
+pub async fn accept_legal(client: &ApiClient) -> Result<(), AppError> {
+    let (status, body) = client.post_raw("/api/legal/accept", &()).await?;
+    if !(200..300).contains(&status) {
+        return Err(crate::api::lookup::error_from(status, &body));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -213,6 +213,7 @@ export const descriptor: ModuleDescriptor = {
   route: "/snapchat",
   label: "Snapchat",
   icon: Ghost,
+  brandSrc: "/brand/snapchat.svg",
   description: "Look up a Snapchat profile by username.",
   inputs: [
     {
@@ -247,6 +248,7 @@ export const emailDescriptor: ModuleDescriptor = {
   route: "/snapchat/email",
   label: "Snapchat email to user",
   icon: Mail,
+  brandSrc: "/brand/snapchat.svg",
   description: "Resolve an email address to the linked Snapchat account.",
   inputs: [
     {
@@ -270,6 +272,7 @@ export const phoneDescriptor: ModuleDescriptor = {
   route: "/snapchat/phone",
   label: "Snapchat phone to user",
   icon: Phone,
+  brandSrc: "/brand/snapchat.svg",
   description: "Resolve a phone number to the linked Snapchat account.",
   inputs: [
     {

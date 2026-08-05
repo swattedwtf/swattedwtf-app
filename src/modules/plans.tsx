@@ -297,10 +297,7 @@ export function Plans({
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-          / Plans
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">
+        <h1 className="text-3xl font-semibold tracking-tight text-white">
           Choose your intelligence tier
         </h1>
         <p className="mt-1 max-w-[70ch] text-sm text-white/70">

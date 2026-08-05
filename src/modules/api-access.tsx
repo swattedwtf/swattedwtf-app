@@ -125,10 +125,7 @@ export function ApiAccess({ overview }: { overview: Overview }) {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-          / API Access
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white">API Access</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">API Access</h1>
         <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
           Programmatic access to every Swatted.wtf lookup over a simple REST API.
         </p>

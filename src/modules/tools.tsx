@@ -3,7 +3,9 @@ import { Database, MapPinHouse, Radar, ShieldAlert, Smartphone, Users } from "lu
 
 import { copyText } from "../lib/clipboard"
 import { ipc } from "../lib/ipc"
+import { getMapboxToken } from "../lib/mapbox"
 import { RemoteImage } from "./RemoteImage"
+import { MapView } from "./ui/MapView"
 import { list, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
 import {
@@ -438,10 +440,15 @@ export const samsungDescriptor: ModuleDescriptor = {
     },
     {
       name: "mode",
-      label: 'Mode ("direct" or "enumerate", optional)',
+      label: "Mode",
       placeholder: "direct",
-      // Blank is the server's own default: anything that is not exactly
-      // "enumerate" is the direct lookup.
+      // A toggle, like the web, rather than a box you type the word into.
+      // Direct is the server's own default; enumerate sweeps birth dates.
+      options: [
+        { value: "direct", label: "Direct" },
+        { value: "enumerate", label: "Birth date sweep" },
+      ],
+      defaultValue: "direct",
       optional: true,
       validate: (v) => {
         const s = v.trim()
@@ -906,6 +913,10 @@ function AddressMapSection({
   // geocoded result, which looks like a working button and is not one.
   const at = preciseCoords(ll)
   const target = ll ?? center
+  // When the server has shipped a public Mapbox token and we have a point, draw
+  // the real interactive canvas the web shows; otherwise fall back to the static
+  // still (or, with no point at all, say so).
+  const mapToken = getMapboxToken()
   return (
     <Section
       title="Map"
@@ -927,7 +938,14 @@ function AddressMapSection({
         )
       }
     >
-      {url ? (
+      {mapToken && target ? (
+        <MapView
+          token={mapToken}
+          latitude={target.latitude}
+          longitude={target.longitude}
+          className="aspect-video w-full overflow-hidden rounded-xl"
+        />
+      ) : url ? (
         <RemoteImage
           url={url}
           alt={place ? `Map of ${place}` : "Map of the searched address"}
@@ -1489,10 +1507,15 @@ export const falconDescriptor: ModuleDescriptor = {
   inputs: [
     {
       name: "query_type",
-      label: 'Lookup type ("email" or "phone", optional)',
+      label: "Lookup type",
       placeholder: "email",
-      // Blank is the server's own default: anything that is not exactly "phone"
-      // is an email sweep.
+      // A real toggle, matching the web's Email / Phone selector, rather than a
+      // box you type the word into. Defaults to email, the server's own default.
+      options: [
+        { value: "email", label: "Email" },
+        { value: "phone", label: "Phone" },
+      ],
+      defaultValue: "email",
       optional: true,
       validate: (v) => {
         const s = v.trim()

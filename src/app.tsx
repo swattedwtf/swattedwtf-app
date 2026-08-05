@@ -6,6 +6,7 @@ import { TamperedScreen } from "./boot/TamperedScreen"
 import { UpdateReadyScreen } from "./boot/UpdateReadyScreen"
 import { bootReducer, initialBootState, type IntegrityReport } from "./boot/machine"
 import { CodeReveal } from "./auth/CodeReveal"
+import { LegalConsent } from "./auth/LegalConsent"
 import { LoginScreen } from "./auth/LoginScreen"
 import { RegisterScreen } from "./auth/RegisterScreen"
 import { TwoFactorScreen } from "./auth/TwoFactorScreen"
@@ -31,7 +32,12 @@ import { WindowControls } from "./shell/WindowControls"
 import { fadeOnClose, resizeTo, watchMaximized } from "./shell/window"
 import { isUnauthorized, messageOf } from "./lib/errors"
 import { ipc, type Overview } from "./lib/ipc"
+import { setMapboxToken } from "./lib/mapbox"
+import { listen } from "@tauri-apps/api/event"
 import "./theme.css"
+
+/** A lookup handed over from the quick-lookup overlay. */
+type QuickPrefill = { route: string; query: string; mode?: string | null }
 
 /** Minimum time the verifying stage stays on screen, so it never flashes. */
 const VERIFY_DWELL_MS = 900
@@ -50,7 +56,33 @@ export default function App() {
   const [overview, setOverview] = useState<Overview | null>(null)
   const [auth, setAuth] = useState<AuthView>({ view: "login" })
   const [route, setRoute] = useState("/dashboard")
+  // A lookup handed over from the quick-lookup overlay: the target screen reads
+  // it once on mount, seeds its input and runs, then clears it.
+  const [prefill, setPrefill] = useState<QuickPrefill | null>(null)
   const { phase } = state
+
+  // The quick-lookup overlay resolves an identifier and hands it here rather
+  // than opening the web; navigate to the route it names and stash the query so
+  // the screen runs it automatically.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    let cancelled = false
+    void listen<QuickPrefill>("quick-resolve", (event) => {
+      const p = event.payload
+      if (!p?.route || !p?.query) return
+      setRoute(p.route)
+      setPrefill(p)
+    })
+      .then((fn) => {
+        if (cancelled) fn()
+        else unlisten = fn
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [])
 
   // Integrity check, held on screen for at least the dwell so the ring is seen.
   useEffect(() => {
@@ -126,6 +158,11 @@ export default function App() {
   }, [phase, overview])
 
   useEffect(() => watchMaximized(setMaximized), [])
+
+  // Stash the public Mapbox token so the Address Insights map can reach it.
+  useEffect(() => {
+    setMapboxToken(overview?.mapboxToken)
+  }, [overview])
 
   // Fade the shell out before the window closes, from the close button, Alt+F4
   // or the taskbar alike.
@@ -237,28 +274,48 @@ export default function App() {
       // way a one-shot module does, but renders over the SSE transport. Checked
       // alongside the module lookup; the two route sets are disjoint.
       const streamModule = streamModuleForRoute(route)
+      // A pending quick-lookup applies only to the screen it named. Cleared once
+      // that screen has consumed it, so returning to the route later starts clean.
+      const activePrefill = prefill && prefill.route === route ? prefill : null
+      const clearPrefill = () => setPrefill(null)
       // Sits over the shell rather than replacing it, so the app is already
       // built and warm behind the walkthrough and dismissing it reveals a
       // loaded dashboard rather than another loading state.
       return (
         <>
+          {/* Updated-legal gate. Sits over everything until accepted; the
+              server blocks searches until then, so this is not dismissable. */}
+          {overview.legalAccepted === false && (
+            <LegalConsent onAccepted={() => setOverview({ ...overview, legalAccepted: true })} />
+          )}
           {showWalkthrough && <Walkthrough onDone={() => setShowWalkthrough(false)} />}
           {/* Ctrl/Cmd-K launcher, available over every screen. */}
           <CommandPalette onNavigate={setRoute} />
           <Shell route={route} onNavigate={setRoute}>
             {module ? (
-              <ModuleScreen descriptor={module} />
+              <ModuleScreen
+                descriptor={module}
+                initialQuery={activePrefill?.query}
+                onPrefillConsumed={clearPrefill}
+              />
             ) : route === "/search" ? (
               // Search owns a bespoke hero screen (matching the web's centred
               // composer + Browse Modules card) rather than the generic stream
               // form. Checked before the streamModule branch so searchDescriptor
               // still backs it (resolve/Result) without rendering StreamScreen.
-              <SearchScreen onNavigate={setRoute} />
+              <SearchScreen
+                onNavigate={setRoute}
+                initial={activePrefill ? { query: activePrefill.query, mode: activePrefill.mode } : undefined}
+                onPrefillConsumed={clearPrefill}
+              />
             ) : route === "/live-intelligence" ? (
               // Live Intelligence likewise owns a bespoke screen: the web's
               // centred underline tabs + centred input, not StreamScreen's
               // left-aligned pills. Backed by the same descriptor (resolve/Result).
-              <LiveIntelScreen />
+              <LiveIntelScreen
+                initial={activePrefill ? { query: activePrefill.query, mode: activePrefill.mode } : undefined}
+                onPrefillConsumed={clearPrefill}
+              />
             ) : streamModule ? (
               <StreamScreen descriptor={streamModule} />
             ) : route === "/api" ? (

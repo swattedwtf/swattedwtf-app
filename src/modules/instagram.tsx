@@ -489,6 +489,7 @@ export const descriptor: ModuleDescriptor = {
   route: "/instagram",
   label: "Instagram",
   icon: Camera,
+  brandSrc: "/brand/instagram.svg",
   description: "Resolve an Instagram username to its profile, past usernames, posts, stories, and highlights.",
   inputs: [
     {
@@ -507,6 +508,7 @@ export const shareDescriptor: ModuleDescriptor = {
   route: "/instagram/share-resolver",
   label: "Instagram share resolver",
   icon: Link2,
+  brandSrc: "/brand/instagram.svg",
   description: "Expand an Instagram share link to reveal the author, media IDs and exact post time.",
   inputs: [
     {

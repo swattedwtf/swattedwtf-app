@@ -77,6 +77,33 @@ export const KIND_LABEL: Record<IdentifierKind, string> = {
   username: "Username",
 }
 
+/** Where an identifier resolves INSIDE the app: a native route, the query, and
+ *  the mode the target screen should start in. Null when the app has no native
+ *  screen for that kind (an IP), in which case the caller falls back to the web. */
+export type QuickTarget = { route: string; query: string; mode?: string }
+
+export function targetRoute({ kind, value }: Identified): QuickTarget | null {
+  switch (kind) {
+    case "discord":
+      return { route: "/discord", query: value }
+    case "telegram":
+      return { route: "/telegram", query: value }
+    case "domain":
+      return { route: "/search", query: value, mode: "domain" }
+    case "email":
+      return { route: "/search", query: value, mode: "email" }
+    case "username":
+      return { route: "/search", query: value, mode: "username" }
+    case "phone":
+      return { route: "/live-intelligence", query: value, mode: "phone" }
+    case "ip":
+      // No native IP screen; the caller opens the web network page instead.
+      return null
+    default:
+      return null
+  }
+}
+
 const ORIGIN = "https://swattedw.tf"
 
 /**

@@ -13,19 +13,26 @@ import type { PageIcon } from "./types"
  */
 export function PageHeader({
   icon: Icon,
+  brandSrc,
   title,
   description,
 }: {
   icon?: PageIcon
+  brandSrc?: string
   title: string
   description?: string
 }) {
-  if (!Icon && !description) {
+  const hasVisual = Boolean(brandSrc || Icon)
+  if (!hasVisual && !description) {
     return <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
   }
   return (
     <header className="flex items-start gap-3.5">
-      {Icon ? (
+      {brandSrc ? (
+        <span className="glass-tile flex h-11 w-11 shrink-0 items-center justify-center">
+          <img src={brandSrc} alt="" aria-hidden="true" draggable={false} className="h-5 w-5" />
+        </span>
+      ) : Icon ? (
         <span className="glass-tile flex h-11 w-11 shrink-0 items-center justify-center text-white">
           <Icon className="h-5 w-5" />
         </span>

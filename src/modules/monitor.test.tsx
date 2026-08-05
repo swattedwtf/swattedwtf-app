@@ -238,7 +238,7 @@ describe("the screen itself", () => {
   const html = renderToStaticMarkup(<MonitorScreen />)
 
   it("renders its first paint without a payload, and does not throw", () => {
-    expect(html).toContain("/ Monitor")
+    expect(html).toContain("Monitor")
     expect(html).toContain("Watch an email for new breaches")
   })
 
