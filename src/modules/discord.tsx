@@ -270,9 +270,34 @@ export function Result({ data, partial }: ResultProps) {
 
       {d.messages.total > 0 && (
         <Section title={`Indexed messages (${d.messages.total})`}>
-          <p className="text-[13px] text-[var(--color-muted-foreground)]">
-            {d.messages.total.toLocaleString()} messages are indexed for this account.
-          </p>
+          {d.messages.items.length === 0 ? (
+            <p className="text-[13px] text-[var(--color-muted-foreground)]">
+              {d.messages.total.toLocaleString()} messages are indexed, but none were returned on this
+              page.
+            </p>
+          ) : (
+            <ul className="space-y-2.5">
+              {d.messages.items.slice(0, 100).map((raw, i) => {
+                const m = raw as Record<string, unknown>
+                const content = typeof m.content === "string" ? m.content : ""
+                const guild = typeof m.guild_name === "string" ? m.guild_name : ""
+                const channel = typeof m.channel_name === "string" ? m.channel_name : ""
+                const when = typeof m.created_at === "string" ? m.created_at : ""
+                return (
+                  <li key={(m.id as string) || i} className="rounded-lg border border-[var(--color-border)] bg-white/[0.02] p-3">
+                    <div className="mb-1 flex flex-wrap items-center gap-x-2 text-[11px] text-[var(--color-muted-foreground)]">
+                      {guild ? <span className="text-white/80">{guild}</span> : null}
+                      {channel ? <span>#{channel}</span> : null}
+                      {when ? <span className="ml-auto font-mono text-[10px]">{when}</span> : null}
+                    </div>
+                    <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-white/80">
+                      {content || "(no text)"}
+                    </p>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </Section>
       )}
 

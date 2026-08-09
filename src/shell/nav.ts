@@ -68,7 +68,9 @@ export const NAV: NavGroup[] = [
         children: [
           { label: "Profile Lookup", href: "/roblox" },
           { label: "Profile Scraper", href: "/roblox/scraper" },
-          { label: "Server Intel", href: "/roblox/server-intel" },
+          // Server Intel is a live browser-pairing session, so - like the Agent -
+          // it opens directly on the web rather than in an in-app page.
+          { label: "Server Intel", href: "https://swattedw.tf/dashboard/roblox/server-intel", external: true },
         ],
       },
       {

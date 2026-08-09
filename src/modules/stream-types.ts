@@ -30,6 +30,9 @@ export type StreamResultProps = {
   frames: StreamFrame[]
   status: StreamStatus
   error: string | null
+  /** Open a captured machine in the Machine Browser (Search results only). When
+   *  absent, a machine card falls back to copying its log id. */
+  onOpenMachine?: (logId: string) => void
 }
 
 /** One selectable mode (Search's Email / Username / Domain toggle). */

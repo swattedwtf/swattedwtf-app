@@ -22,7 +22,6 @@ import { Plans } from "./modules/plans"
 import { FaceScreen } from "./modules/face"
 import { Investigations } from "./investigations/Investigations"
 import { MonitorScreen } from "./modules/monitor"
-import { ServerIntelRedirect } from "./server-intel/ServerIntelRedirect"
 import { moduleForRoute } from "./modules/registry"
 import { streamModuleForRoute } from "./modules/stream-registry"
 import { Settings } from "./settings/Settings"
@@ -315,6 +314,14 @@ export default function App() {
                 onNavigate={setRoute}
                 initial={activePrefill ? { query: activePrefill.query, mode: activePrefill.mode } : undefined}
                 onPrefillConsumed={clearPrefill}
+                // Open a captured machine from a Search result: jump to the
+                // Machine Browser with the log id pre-filled so it loads there
+                // (the web's "Open in Machine Browser with this log id"), instead
+                // of just copying the id.
+                onOpenMachine={(logId) => {
+                  setRoute("/machine")
+                  setPrefill({ route: "/machine", query: logId })
+                }}
               />
             ) : route === "/live-intelligence" ? (
               // Live Intelligence likewise owns a bespoke screen: the web's
@@ -346,12 +353,6 @@ export default function App() {
               // one-shot lookup, so it owns a screen and calls the
               // telegram-messages module directly. Heist-gated server-side.
               <TelegramMessagesScreen />
-            ) : route === "/roblox/server-intel" ? (
-              // Not a module either, and the least module-like screen here: a
-              // pairing session with an in-game connector rather than a query
-              // and an answer. It polls its own unmetered endpoint, which is
-              // Heist-gated on minting exactly as the web's pair route is.
-              <ServerIntelRedirect />
             ) : route === "/face" ? (
               // A metered lookup like any other, and the only credit-billed one,
               // but its input is an image rather than a string, so it brings its

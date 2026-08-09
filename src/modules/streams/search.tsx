@@ -514,19 +514,34 @@ function CredentialsPanel({ credentials }: { credentials: Credential[] }) {
   )
 }
 
-/** The captured machines the records reference. No file viewer on desktop yet,
- *  so each card surfaces the log id to carry into the Machine Browser. */
-function MachinesList({ machines }: { machines: VictimMachine[] }) {
+/** The captured machines the records reference. Each card opens the machine in
+ *  the Machine Browser (carrying its log id), matching the web; if no navigation
+ *  handler is available it falls back to copying the log id. */
+function MachinesList({
+  machines,
+  onOpenMachine,
+}: {
+  machines: VictimMachine[]
+  onOpenMachine?: (logId: string) => void
+}) {
   return (
     <div className="space-y-3">
       {machines.map((m, i) => (
-        <MachineCard key={m.logId} machine={m} index={i} />
+        <MachineCard key={m.logId} machine={m} index={i} onOpenMachine={onOpenMachine} />
       ))}
     </div>
   )
 }
 
-function MachineCard({ machine, index }: { machine: VictimMachine; index: number }) {
+function MachineCard({
+  machine,
+  index,
+  onOpenMachine,
+}: {
+  machine: VictimMachine
+  index: number
+  onOpenMachine?: (logId: string) => void
+}) {
   const [copied, setCopied] = useState(false)
   async function copy() {
     const ok = await copyText(machine.logId)
@@ -545,17 +560,29 @@ function MachineCard({ machine, index }: { machine: VictimMachine; index: number
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-white">Captured machine available</span>
         <span className="mt-0.5 block text-xs text-white/70">
-          From {machine.source}. Open it in Machine Browser with this log id.
+          {onOpenMachine
+            ? `From ${machine.source}. Open it in the Machine Browser to view its files.`
+            : `From ${machine.source}. Open it in Machine Browser with this log id.`}
         </span>
       </span>
-      <button
-        type="button"
-        onClick={() => void copy()}
-        title={`Copy ${machine.logId}`}
-        className="btn-secondary btn-compact shrink-0 font-mono"
-      >
-        {copied ? "Copied" : machine.logId.slice(0, 10)}
-      </button>
+      {onOpenMachine ? (
+        <button
+          type="button"
+          onClick={() => onOpenMachine(machine.logId)}
+          className="btn-secondary btn-compact shrink-0"
+        >
+          Open in Machine Browser
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void copy()}
+          title={`Copy ${machine.logId}`}
+          className="btn-secondary btn-compact shrink-0 font-mono"
+        >
+          {copied ? "Copied" : machine.logId.slice(0, 10)}
+        </button>
+      )}
     </div>
   )
 }
@@ -1036,7 +1063,7 @@ function InvFileRows({ section }: { section: InvSection<InvFile> }) {
 
 type Tab = "all" | "credentials" | "profiles" | "machines"
 
-function SearchResult({ frames, status }: StreamResultProps) {
+function SearchResult({ frames, status, onOpenMachine }: StreamResultProps) {
   const [tab, setTab] = useState<Tab>("all")
 
   const records = mergedRecords(frames)
@@ -1105,7 +1132,7 @@ function SearchResult({ frames, status }: StreamResultProps) {
                 count={machines.length}
                 hint="Stealer logs referenced by this result."
               />
-              <MachinesList machines={machines} />
+              <MachinesList machines={machines} onOpenMachine={onOpenMachine} />
             </section>
           ) : null}
 

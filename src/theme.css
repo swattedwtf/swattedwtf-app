@@ -54,9 +54,20 @@
     0 16px 40px -18px oklch(0 0 0 / 0.66),
     0 3px 10px -5px oklch(0 0 0 / 0.45);
   /* The two fills. Panels are the floating cards, chrome is the sidebar,
-     fields and chips, exactly the web's two tiers. */
+     fields and chips, exactly the web's two tiers.
+
+     DERIVED FROM THE THEME TOKENS so the Appearance controls actually move the
+     surfaces people look at. These were hardcoded near-black, which meant the
+     glass panels - the dominant surface of the whole app - never changed when
+     you picked a preset, an accent or a depth, so theming looked broken. Now
+     they track --card / --muted (which applyTheme() rewrites from depth+accent),
+     at the same 0.62 / 0.55 opacity as before. The flat oklch fallback keeps the
+     old look on any webview without color-mix. Mode is forced dark, so --card /
+     --muted stay dark and text legibility over the artwork is preserved. */
   --glass-panel-fill: oklch(0.08 0 0 / 0.62);
+  --glass-panel-fill: color-mix(in oklch, var(--card) 62%, transparent);
   --glass-chrome-fill: oklch(0.14 0 0 / 0.55);
+  --glass-chrome-fill: color-mix(in oklch, var(--muted) 55%, transparent);
 
   /* Corner radii, all derived from --radius so the Roundness control in
      Settings actually moves the surfaces people look at.

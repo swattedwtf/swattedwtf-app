@@ -41,11 +41,14 @@ export function SearchScreen({
   onNavigate,
   initial,
   onPrefillConsumed,
+  onOpenMachine,
 }: {
   onNavigate: (route: string) => void
   /** A query handed over from the quick-lookup overlay: run automatically. */
   initial?: { query: string; mode?: string | null }
   onPrefillConsumed?: () => void
+  /** Open a captured machine from a result in the Machine Browser. */
+  onOpenMachine?: (logId: string) => void
 }) {
   const [query, setQuery] = useState(initial?.query ?? "")
   const [mode, setMode] = useState<Mode>((initial?.mode as Mode) ?? "email")
@@ -214,7 +217,7 @@ export function SearchScreen({
               onRetry={() => void submit()}
             />
           ) : null}
-          <Result frames={frames} status={status} error={streamError} />
+          <Result frames={frames} status={status} error={streamError} onOpenMachine={onOpenMachine} />
         </div>
       ) : null}
     </div>

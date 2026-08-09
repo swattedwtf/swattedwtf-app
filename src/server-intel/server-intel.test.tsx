@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 
 import { ipc } from "../lib/ipc"
 import { BUILT_IN_ROUTES } from "../modules/registry"
-import { isEnabled } from "../shell/nav"
+import { NAV, isEnabled } from "../shell/nav"
 import {
   LIVE_WINDOW_MS,
   NEW_ACCOUNT_DAYS,
@@ -76,14 +76,16 @@ const player = (over: Partial<Player> = {}): Player => ({ ...toPlayer(rawPlayer)
 
 // ---------------------------------------------------------------------------
 
-describe("Server Intel is a built-in route, not a lookup module", () => {
-  it("is enabled through BUILT_IN_ROUTES so its nav row is live", () => {
-    expect(BUILT_IN_ROUTES).toContain("/roblox/server-intel")
-    expect(isEnabled("/roblox/server-intel")).toBe(true)
+describe("Server Intel opens on the web, like the Agent", () => {
+  it("is NOT an in-app built-in route", () => {
+    expect(BUILT_IN_ROUTES).not.toContain("/roblox/server-intel")
   })
 
-  it("stays exact, so a child path is not this screen", () => {
-    expect(isEnabled("/roblox/server-intel/evil")).toBe(false)
+  it("is an external nav link under Roblox pointing at the web dashboard", () => {
+    const roblox = NAV.flatMap((g) => g.items).find((i) => i.label === "Roblox")
+    const si = roblox?.children?.find((c) => c.label === "Server Intel")
+    expect(si?.external).toBe(true)
+    expect(si?.href).toContain("swattedw.tf")
   })
 
   it("does not shadow the other two Roblox leaves", () => {
