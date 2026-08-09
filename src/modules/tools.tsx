@@ -421,8 +421,8 @@ export const samsungDescriptor: ModuleDescriptor = {
       // kept FIRST so it sits at the top of the form exactly as the web does.
       // Direct is the server's own default; enumerate sweeps birth dates.
       options: [
-        { value: "direct", label: "Direct" },
-        { value: "enumerate", label: "Birth date sweep" },
+        { value: "direct", label: "Direct Lookup" },
+        { value: "enumerate", label: "Enumerate DOB" },
       ],
       defaultValue: "direct",
       optional: true,

@@ -32,7 +32,13 @@ export type InputField = {
    * should name the option selected first; the value is always one of these.
    */
   options?: { value: string; label: string }[]
-  /** The value the field starts on, e.g. the default toggle option. */
+  /**
+   * Render as an on/off switch (label + sliding toggle), matching the web's
+   * boolean toggles (the Roblox scraper's "Show deleted", "Show status"). The
+   * value is the string "true" or "false".
+   */
+  kind?: "switch"
+  /** The value the field starts on, e.g. the default toggle option or "false". */
   defaultValue?: string
   validate(v: string): string | null
 }

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Blocks, Database, KeyRound, ShieldAlert } from "lucide-react"
+import { AtSign, Blocks, Database, Globe, KeyRound, ShieldAlert } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { rows, withDefaults } from "./safe"
@@ -189,6 +189,8 @@ function BreachSection({
   const [reveal, setReveal] = useState(false)
   const total = count || breaches.length
   const passwords = breaches.filter((b) => b.password).length
+  const emails = breaches.filter((b) => b.email).length
+  const ips = breaches.filter((b) => b.ip).length
   const sources = new Set(breaches.map((b) => b.source).filter(Boolean)).size
 
   return (
@@ -201,6 +203,8 @@ function BreachSection({
             tiles={[
               { icon: Database, label: "Breach rows", value: total },
               { icon: KeyRound, label: "Passwords", value: passwords },
+              { icon: AtSign, label: "Emails", value: emails },
+              { icon: Globe, label: "IPs", value: ips },
               { icon: ShieldAlert, label: "Sources", value: sources },
             ]}
           />

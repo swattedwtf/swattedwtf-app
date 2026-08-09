@@ -3,7 +3,7 @@ import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, rows, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
-import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./ui"
+import { BadgeRow, BreachCards, EmptyState, FieldGrid, LockedSection, ProfileCard, Section, type BreachEntry } from "./ui"
 
 /**
  * Discord.
@@ -57,10 +57,22 @@ function formatDate(iso: string | null): string {
 }
 
 /** A breach row, whichever of its many optional fields the source filled in. */
-function breachLine(row: Record<string, unknown>): string {
-  const parts = [row.email, row.username, row.full_name, row.phone_number, row.ip]
-    .filter((v): v is string => typeof v === "string" && v.length > 0)
-  return parts.join("  ")
+/** Map an OathNet breach row to a labeled record card, revealing the password
+ *  and hash (masked until the Reveal toggle) the old one-line list dropped. */
+function toBreachEntry(row: Record<string, unknown>): BreachEntry {
+  const s = (k: string) => (typeof row[k] === "string" ? (row[k] as string) : "")
+  return {
+    source: s("dbname") || s("source") || s("database") || "Unknown source",
+    fields: [
+      { label: "Username", value: s("username") },
+      { label: "Email", value: s("email") },
+      { label: "Name", value: s("full_name") },
+      { label: "Phone", value: s("phone_number") },
+      { label: "IP", value: s("ip") },
+      { label: "Password", value: s("password"), sensitive: true },
+      { label: "Hash", value: s("hash") || s("password_hash"), sensitive: true },
+    ],
+  }
 }
 
 const EMPTY_PROFILE: Profile = {
@@ -234,13 +246,7 @@ export function Result({ data, partial }: ResultProps) {
           {d.breaches.length === 0 ? (
             <FailedNote />
           ) : (
-            <ul className="space-y-1 font-mono text-[11px] leading-relaxed text-white/70">
-              {d.breaches.slice(0, 50).map((b, i) => (
-                <li key={i} className="truncate">
-                  {breachLine(b) || "Record with no readable fields"}
-                </li>
-              ))}
-            </ul>
+            <BreachCards records={d.breaches.map(toBreachEntry)} />
           )}
         </Section>
       )}

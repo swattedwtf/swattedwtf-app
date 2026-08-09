@@ -129,8 +129,11 @@ describe("Discord result", () => {
   it("renders a connection with no URL as plain text, not a dead link", () => {
     // The server nulls any link that is not http(s), so this is the shape a
     // stripped javascript: URL arrives in.
+    // Based on the sparse payload so the only thing that could render a button
+    // is the connection itself (a populated payload legitimately has copy /
+    // reveal buttons in the breach cards).
     const html = render({
-      ...full,
+      ...sparse,
       connections: [{ type: "steam", name: "someone", url: null }],
     })
     expect(html).toContain("someone")

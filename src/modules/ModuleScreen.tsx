@@ -360,19 +360,44 @@ export function ModuleScreen({
     const id = `${descriptor.id}-${field.name}`
     const error = errors[field.name]
 
-    // A fixed set of choices renders as a segmented toggle (Falcon's Email /
-    // Phone selector) rather than a text box you have to type the value into.
+    // A boolean renders as an on/off switch (label + sliding toggle), matching
+    // the web's Roblox-scraper toggles. Value is the string "true" / "false".
+    if (field.kind === "switch") {
+      const on = (values[field.name] ?? field.defaultValue ?? "false") === "true"
+      return (
+        <div key={field.name} className="flex items-center justify-between py-1.5">
+          <span className="text-[13.5px] font-medium text-white">{field.label}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            aria-label={field.label}
+            onClick={() => setValues((v) => ({ ...v, [field.name]: on ? "false" : "true" }))}
+            className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+              on ? "border-white/40 bg-white" : "border-[var(--color-border)] bg-white/10"
+            }`}
+          >
+            <span
+              className={`absolute top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full shadow transition-all ${
+                on ? "left-[22px] bg-black" : "left-[3px] bg-white"
+              }`}
+            />
+          </button>
+        </div>
+      )
+    }
+
+    // A fixed set of choices renders as a segmented toggle (Samsung's mode,
+    // Falcon's Email / Phone), styled like the web's thin pill: a rounded track
+    // with a white active segment and muted inactive labels.
     if (field.options) {
       const current = values[field.name] ?? field.defaultValue ?? field.options[0]?.value
       return (
         <div key={field.name} className="min-w-0">
-          <label className="block font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-muted-foreground)]">
-            {field.label}
-          </label>
           <div
             role="radiogroup"
             aria-label={field.label}
-            className="glass-tile mt-2 inline-flex items-center gap-1 rounded-full p-1"
+            className="inline-flex rounded-full border border-[var(--color-border)] bg-white/[0.03] p-0.5"
           >
             {field.options.map((opt) => {
               const on = current === opt.value
@@ -383,7 +408,9 @@ export function ModuleScreen({
                   role="radio"
                   aria-checked={on}
                   onClick={() => setValues((v) => ({ ...v, [field.name]: opt.value }))}
-                  className={on ? "btn-primary btn-compact" : "btn-secondary btn-compact"}
+                  className={`rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors ${
+                    on ? "bg-white text-black" : "text-[var(--color-muted-foreground)] hover:text-white"
+                  }`}
                 >
                   {opt.label}
                 </button>

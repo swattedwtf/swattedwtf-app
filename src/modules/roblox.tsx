@@ -4,7 +4,7 @@ import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { list, rows, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
-import { BadgeRow, EmptyState, FieldGrid, LockedSection, ProfileCard, Section } from "./ui"
+import { BadgeRow, BreachCards, EmptyState, FieldGrid, LockedSection, ProfileCard, Section, type BreachEntry } from "./ui"
 
 /**
  * Roblox, two of its three leaves.
@@ -163,10 +163,21 @@ const EMPTY_ROBLOX_PROFILE: RobloxProfile = {
 }
 
 /** A stealer breach row, whichever of its optional fields the source filled. */
-function breachLine(row: StealerBreach): string {
-  return [row.email, row.username, row.full_name, row.phone_number, row.ip]
-    .filter((v) => typeof v === "string" && v.length > 0)
-    .join("  ")
+/** Map a stealer breach row to a labeled record card, revealing password + hash
+ *  (masked until the Reveal toggle) that the old one-line list dropped. */
+function toBreachEntry(b: StealerBreach): BreachEntry {
+  return {
+    source: b.dbname || "Unknown source",
+    fields: [
+      { label: "Username", value: b.username },
+      { label: "Email", value: b.email },
+      { label: "Name", value: b.full_name },
+      { label: "Phone", value: b.phone_number },
+      { label: "IP", value: b.ip },
+      { label: "Password", value: b.password, sensitive: true },
+      { label: "Hash", value: b.password_hash, sensitive: true },
+    ],
+  }
 }
 
 type RobloxGroup = {
@@ -459,13 +470,7 @@ export function Result({ data, partial }: ResultProps) {
 
           {stealer.breaches.length > 0 && (
             <Section title={`Breach records (${stealer.breaches.length})`}>
-              <ul className="space-y-1 font-mono text-[11px] leading-relaxed text-white/70">
-                {stealer.breaches.slice(0, 50).map((b, i) => (
-                  <li key={b.id || i} className="truncate">
-                    {breachLine(b) || "Record with no readable fields"}
-                  </li>
-                ))}
-              </ul>
+              <BreachCards records={stealer.breaches.map(toBreachEntry)} />
             </Section>
           )}
 
@@ -711,39 +716,30 @@ export const scraperDescriptor: ModuleDescriptor = {
     },
     {
       name: "showDeleted",
-      label: "Include deleted accounts",
+      // Matches the web's "Show Deleted/Terminated Users" on/off switch.
+      label: "Show deleted / terminated users",
       placeholder: "false",
       optional: true,
-      // Real toggle buttons, matching the web, instead of typing "true"/"false".
-      options: [
-        { value: "false", label: "No" },
-        { value: "true", label: "Yes" },
-      ],
+      kind: "switch",
       defaultValue: "false",
       validate: (v) => {
         const s = v.trim()
-        // Blank is legitimate: the field is optional and default-seeded, and the
-        // server reads a missing value as its own default (false).
         if (s.length === 0) return null
-        return s === "true" || s === "false" ? null : 'Choose "Yes" or "No".'
+        return s === "true" || s === "false" ? null : 'Choose on or off.'
       },
     },
     {
       name: "showStatus",
-      label: "Fetch presence status",
+      // Matches the web's "Show Status" on/off switch.
+      label: "Show presence status",
       placeholder: "false",
       optional: true,
-      options: [
-        { value: "false", label: "No" },
-        { value: "true", label: "Yes" },
-      ],
+      kind: "switch",
       defaultValue: "false",
       validate: (v) => {
         const s = v.trim()
-        // Blank is legitimate: the field is optional and default-seeded, and the
-        // server reads a missing value as its own default (false).
         if (s.length === 0) return null
-        return s === "true" || s === "false" ? null : 'Choose "Yes" or "No".'
+        return s === "true" || s === "false" ? null : 'Choose on or off.'
       },
     },
   ],

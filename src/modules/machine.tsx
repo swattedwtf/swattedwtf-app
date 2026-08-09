@@ -4,7 +4,7 @@ import { HardDrive } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { list, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
-import { EmptyState, FieldGrid, ProfileCard, Section } from "./ui"
+import { EmptyState, FieldGrid, ProfileCard, Section, StatTiles } from "./ui"
 
 /**
  * Machine Browser.
@@ -296,8 +296,17 @@ function DumpView({ dump, searchId }: { dump: DumpData; searchId: string | null 
         meta={[
           { label: "Hardware ID", value: dump.hardwareId, mono: true },
           { label: "Log hash", value: dump.hash, mono: true },
-          { label: "Files", value: dump.stats.files ? String(dump.stats.files) : "" },
-          { label: "Credentials", value: dump.totalCreds ? String(dump.totalCreds) : "" },
+        ]}
+      />
+
+      {/* The four counts the web shows as a stat grid (Files / Folders /
+          Credentials / Emails), instead of burying two of them in the card. */}
+      <StatTiles
+        tiles={[
+          { label: "Files", value: dump.stats.files },
+          { label: "Folders", value: dump.stats.folders },
+          { label: "Credentials", value: dump.totalCreds || dump.stats.creds },
+          { label: "Emails", value: dump.emailCount || dump.stats.emails },
         ]}
       />
 
