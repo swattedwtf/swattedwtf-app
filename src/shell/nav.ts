@@ -96,6 +96,7 @@ export const NAV: NavGroup[] = [
         children: [
           { label: "User Lookup", href: "/telegram" },
           { label: "Phone -> User", href: "/telegram/phone" },
+          { label: "Messages", href: "/telegram/messages" },
         ],
       },
       { label: "Minecraft", href: "/minecraft" },

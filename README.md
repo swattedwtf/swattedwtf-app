@@ -11,24 +11,23 @@ macOS build in v1. The Windows installer is per-user and needs no administrator
 prompt. An `.msi` was published up to v0.1.8 and is gone from later releases: it
 required elevation, and nothing ever linked to it.
 
-> **Screenshot to add before release:** the boot sequence (verify, update check,
-> welcome reveal), plus the Windows SmartScreen dialog described below. No
-> screenshots exist yet, so this README describes both in words.
+Windows (NSIS `-setup.exe`) and Linux (`.deb`, `.AppImage`) builds are published on
+the Releases page, and the app auto-updates over a signed updater (see below).
 
-> **Pre-release status.** Version 0.1.0 is a first release and has not yet been
-> run widely. Linux builds are published; the Windows installer is produced by
-> CI and is not in this release. The updater and the bundled integrity manifest
-> are both wired up as described below.
-
-## What v1 does
+## What the app does
 
 - A boot sequence: integrity check, update check, then a branded welcome reveal.
 - Login, two-factor entry, and registration.
 - The dashboard home, with your plan, usage and account details.
+- The lookup modules: Search, Live Intelligence, Machine Browser, Reverse Face,
+  Discord, Instagram, Roblox (profile, scraper, server intel), TikTok, Snapchat,
+  Telegram (user, phone, messages), Minecraft, and the Tools group (Samsung,
+  Skiptracer, Address Insights, Falcon, IntelX, Cobra).
+- Investigations, Monitor, and API access.
 - Settings.
 
-Every other entry in the sidebar renders visibly disabled with a "soon" pill.
-Those modules are not in this release.
+Access to each module follows your plan; Heist-only modules are gated
+server-side, exactly as on the web dashboard.
 
 ## Installing
 

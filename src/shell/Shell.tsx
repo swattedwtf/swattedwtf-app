@@ -25,7 +25,7 @@ export function Shell({
   }, [])
 
   return (
-    <div className="relative flex h-full bg-[#0b0b0b]">
+    <div className="relative flex h-full bg-[var(--color-background)]">
       {/* Shared with the web dashboard so the two read as one product. */}
       <div className="app-backdrop">
         <div className="app-backdrop-wash" />

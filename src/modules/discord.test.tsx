@@ -74,11 +74,13 @@ describe("Discord result", () => {
     expect(html).toContain("Breaches (1)")
   })
 
-  it("renders a sparse payload without throwing, using empty states", () => {
+  it("renders a sparse payload without throwing, hiding empty sections", () => {
+    // Hide-empty: sections with no results are omitted entirely rather than
+    // shown as an empty-state card. The profile still renders.
     const html = render(sparse)
-    expect(html).toContain("No linked accounts.")
-    expect(html).toContain("No servers found.")
-    expect(html).toContain("No breach records found.")
+    expect(html).not.toContain("No linked accounts.")
+    expect(html).not.toContain("No servers found.")
+    expect(html).not.toContain("No breach records found.")
     expect(html).toContain("Unknown")
   })
 
@@ -91,9 +93,11 @@ describe("Discord result", () => {
     expect(html).not.toContain("No previous usernames recorded.")
   })
 
-  it("says there are none when the provider answered and had none", () => {
+  it("hides username history when the provider answered and had none", () => {
+    // Hide-empty: a clean checked-and-empty history is omitted, not shown as an
+    // empty-state card. "Unavailable" (a failure) is still shown - see above.
     const html = render({ ...full, usernameHistory: [], historyUnavailable: false })
-    expect(html).toContain("No previous usernames recorded.")
+    expect(html).not.toContain("No previous usernames recorded.")
     expect(html).not.toContain("unavailable")
   })
 
@@ -105,9 +109,12 @@ describe("Discord result", () => {
     expect(html).not.toContain("No compromised devices found.")
   })
 
-  it("shows an empty state when Heist is present and there is nothing", () => {
+  it("hides the compromised-devices section when Heist is present and there is nothing", () => {
+    // Hide-empty: a clean empty (Heist present, provider answered, no rows and
+    // no failure flag) is omitted rather than shown as an empty-state card.
     const html = render({ ...full, stealerLogs: [], stealerLocked: false })
-    expect(html).toContain("No compromised devices found.")
+    expect(html).not.toContain("No compromised devices found.")
+    expect(html).not.toContain("Compromised devices")
   })
 
   it("leaves naming the failed sources to ResultView, which renders it once", () => {

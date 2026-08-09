@@ -74,7 +74,18 @@ const EMPTY_PROFILE: Profile = {
   createdAt: null,
 }
 
-export function Result({ data }: ResultProps) {
+/** A small "this section's source failed" note, so a section that could not be
+ *  fetched reads as an outage to retry rather than as a clean "nothing found". */
+function FailedNote() {
+  return (
+    <p className="text-[12px] text-[var(--color-muted-foreground)]">
+      This source did not respond. Try the lookup again.
+    </p>
+  )
+}
+
+export function Result({ data, partial }: ResultProps) {
+  const failed = (name: string) => Array.isArray(partial) && partial.includes(name)
   const raw = withDefaults(data, {} as Partial<DiscordData>)
   const p = withDefaults(raw.profile, EMPTY_PROFILE)
   const d: DiscordData = {
@@ -116,10 +127,8 @@ export function Result({ data }: ResultProps) {
         ) : null}
       </ProfileCard>
 
-      <Section title="Connections">
-        {d.connections.length === 0 ? (
-          <EmptyState message="No linked accounts." />
-        ) : (
+      {d.connections.length > 0 && (
+        <Section title="Connections">
           <ul className="space-y-1.5">
             {d.connections.map((c, i) => (
               <li key={`${c.type}-${c.name}-${i}`} className="flex items-center gap-2 text-[13px]">
@@ -141,32 +150,30 @@ export function Result({ data }: ResultProps) {
               </li>
             ))}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
-      <Section title="Username history">
-        {/* Three states, not two. "Unavailable" is not "none": the provider
-            behind this is frequently down, and saying there are no previous
-            usernames when we simply could not ask is a claim we cannot make. */}
-        {d.historyUnavailable ? (
-          <EmptyState message="Username history is unavailable right now." />
-        ) : !d.usernameHistory || d.usernameHistory.length === 0 ? (
-          <EmptyState message="No previous usernames recorded." />
-        ) : (
-          <FieldGrid
-            fields={d.usernameHistory.map((h) => ({
-              label: h.date || "Unknown date",
-              value: h.username,
-              mono: true,
-            }))}
-          />
-        )}
-      </Section>
+      {/* Shown only when it says something: an "unavailable" (the provider is
+          frequently down, which is not the same as "none") or actual history.
+          A clean "answered and had none" hides, per hide-empty. */}
+      {(d.historyUnavailable || (d.usernameHistory && d.usernameHistory.length > 0)) && (
+        <Section title="Username history">
+          {d.historyUnavailable ? (
+            <EmptyState message="Username history is unavailable right now." />
+          ) : (
+            <FieldGrid
+              fields={(d.usernameHistory ?? []).map((h) => ({
+                label: h.date || "Unknown date",
+                value: h.username,
+                mono: true,
+              }))}
+            />
+          )}
+        </Section>
+      )}
 
-      <Section title={`Servers${d.servers.length ? ` (${d.servers.length})` : ""}`}>
-        {d.servers.length === 0 ? (
-          <EmptyState message="No servers found." />
-        ) : (
+      {d.servers.length > 0 && (
+        <Section title={`Servers (${d.servers.length})`}>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {d.servers.map((s) => (
               <li key={s.id} className="flex items-center gap-2.5">
@@ -186,8 +193,8 @@ export function Result({ data }: ResultProps) {
               </li>
             ))}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
       {/* The web's highest-value panel, which the desktop dropped entirely. */}
       {d.osint && (
@@ -202,59 +209,64 @@ export function Result({ data }: ResultProps) {
         </Section>
       )}
 
-      <Section title="Alt accounts">
-        {/* The alt provider answers null on failure rather than throwing, so an
-            empty list with no marker read as "this account has no alts". */}
-        {!d.altsChecked ? (
-          <EmptyState message="The alt-account scan did not run, so nothing can be said about linked accounts." />
-        ) : (
-          <FieldGrid
-            fields={[
-              {
-                label: "Linked alts",
-                value: d.alts.length > 0 ? d.alts.join(", ") : "",
+      {/* Alt accounts: shown only when the scan actually ran and found alts or
+          VPN attempts. A scan that did not run is not "no results", so it stays;
+          a clean checked-and-empty hides. */}
+      {(!d.altsChecked || d.alts.length > 0 || d.vpnAttempts > 0) && (
+        <Section title="Alt accounts">
+          {!d.altsChecked ? (
+            <EmptyState message="The alt-account scan did not run, so nothing can be said about linked accounts." />
+          ) : (
+            <FieldGrid
+              fields={[
+                { label: "Linked alts", value: d.alts.length > 0 ? d.alts.join(", ") : "", mono: true },
+                { label: "VPN attempts", value: d.vpnAttempts > 0 ? String(d.vpnAttempts) : "" },
+              ]}
+            />
+          )}
+        </Section>
+      )}
+
+      {/* Breaches: has-data shows; a failed source shows a retry note (so a
+          capped upstream is not misread as "none"); a genuine empty hides. */}
+      {(d.breaches.length > 0 || failed("breachSearch")) && (
+        <Section title={`Breaches${d.breaches.length ? ` (${d.breaches.length})` : ""}`}>
+          {d.breaches.length === 0 ? (
+            <FailedNote />
+          ) : (
+            <ul className="space-y-1 font-mono text-[11px] leading-relaxed text-white/70">
+              {d.breaches.slice(0, 50).map((b, i) => (
+                <li key={i} className="truncate">
+                  {breachLine(b) || "Record with no readable fields"}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
+
+      {/* Compromised devices: locked (a real state) stays; has-data shows; a
+          failed source shows a retry note; a genuine empty hides. */}
+      {(d.stealerLocked || d.stealerLogs.length > 0 || failed("stealerLogs")) && (
+        <Section title="Compromised devices">
+          {d.stealerLocked ? (
+            <LockedSection
+              title="Compromised devices"
+              message="Swatted Heist unlocks compromised-device records for this account."
+            />
+          ) : d.stealerLogs.length === 0 ? (
+            <FailedNote />
+          ) : (
+            <FieldGrid
+              fields={d.stealerLogs.slice(0, 25).map((s, i) => ({
+                label: String(s.pwned_at ?? s.indexed_at ?? `Record ${i + 1}`),
+                value: String(s.log_id ?? ""),
                 mono: true,
-              },
-              { label: "VPN attempts", value: d.vpnAttempts > 0 ? String(d.vpnAttempts) : "" },
-            ]}
-          />
-        )}
-      </Section>
-
-      <Section title={`Breaches${d.breaches.length ? ` (${d.breaches.length})` : ""}`}>
-        {d.breaches.length === 0 ? (
-          <EmptyState message="No breach records found." />
-        ) : (
-          <ul className="space-y-1 font-mono text-[11px] leading-relaxed text-white/70">
-            {d.breaches.slice(0, 50).map((b, i) => (
-              <li key={i} className="truncate">
-                {breachLine(b) || "Record with no readable fields"}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Compromised devices">
-        {/* Silent gating on the server: a non-Heist account gets an empty list
-            with a 200, so without the flag this would read as "nothing found". */}
-        {d.stealerLocked ? (
-          <LockedSection
-            title="Compromised devices"
-            message="Swatted Heist unlocks compromised-device records for this account."
-          />
-        ) : d.stealerLogs.length === 0 ? (
-          <EmptyState message="No compromised devices found." />
-        ) : (
-          <FieldGrid
-            fields={d.stealerLogs.slice(0, 25).map((s, i) => ({
-              label: String(s.pwned_at ?? s.indexed_at ?? `Record ${i + 1}`),
-              value: String(s.log_id ?? ""),
-              mono: true,
-            }))}
-          />
-        )}
-      </Section>
+              }))}
+            />
+          )}
+        </Section>
+      )}
 
       {d.messages.total > 0 && (
         <Section title={`Indexed messages (${d.messages.total})`}>

@@ -17,6 +17,7 @@ import type { Overview, SettingsView } from "../lib/ipc"
 import {
   AccountSection,
   AdvancedSection,
+  EmailSection,
   PlanSection,
   SecuritySection,
   ShortcutSection,
@@ -82,15 +83,16 @@ describe("Account", () => {
     const html = render(<AccountSection overview={overview} busy={false} onLogout={() => {}} />)
     expect(html).toContain("sujrb")
     expect(html).toContain("#42")
-    expect(html).toContain("a@b.c")
     expect(html).toContain("Log out")
+  })
+
+  it("shows the current email in its own section", () => {
+    expect(render(<EmailSection overview={overview} />)).toContain("a@b.c")
   })
 
   it("says so when no email is set rather than leaving a blank", () => {
     const anon = { ...overview, user: { ...overview.user, email: null } }
-    expect(render(<AccountSection overview={anon} busy={false} onLogout={() => {}} />)).toContain(
-      "Not set",
-    )
+    expect(render(<EmailSection overview={anon} />)).toContain("Not set")
   })
 })
 

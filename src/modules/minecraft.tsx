@@ -1,9 +1,10 @@
-import { Blocks } from "lucide-react"
+import { useState } from "react"
+import { Blocks, Database, KeyRound, ShieldAlert } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
 import { rows, withDefaults } from "./safe"
 import type { ModuleDescriptor, ResultProps } from "./types"
-import { EmptyState, FieldGrid, ProfileCard, Section } from "./ui"
+import { EmptyState, FieldGrid, ProfileCard, RecordCard, Section, StatTiles, type LeakField } from "./ui"
 
 /**
  * Minecraft.
@@ -167,22 +168,66 @@ export function Result({ data }: ResultProps) {
         </Section>
       )}
 
-      <Section title={`Breaches${d.breachCount ? ` (${d.breachCount})` : ""}`}>
-        {d.breaches.length === 0 ? (
-          <EmptyState message="No breach records found." />
-        ) : (
-          <ul className="space-y-1 font-mono text-[11px] leading-relaxed text-white/70">
-            {d.breaches.slice(0, 50).map((b, i) => (
-              <li key={i} className="truncate">
-                {[b.username, b.email, b.ip, b.source].filter(Boolean).join("  ") ||
-                  "Record with no readable fields"}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
+      <BreachSection breaches={d.breaches} count={d.breachCount} />
     </div>
+  )
+}
+
+/**
+ * Breach records, drawn like the web: a Rows / Passwords / Sources stat row over
+ * per-source cards (RecordCard) with labeled, copyable fields and the password
+ * held behind a reveal toggle. Replaces the old flat one-line-per-row list that
+ * dropped the password entirely.
+ */
+function BreachSection({
+  breaches,
+  count,
+}: {
+  breaches: MinecraftData["breaches"]
+  count: number
+}) {
+  const [reveal, setReveal] = useState(false)
+  const total = count || breaches.length
+  const passwords = breaches.filter((b) => b.password).length
+  const sources = new Set(breaches.map((b) => b.source).filter(Boolean)).size
+
+  return (
+    <Section title={`Breaches${total ? ` (${total})` : ""}`}>
+      {breaches.length === 0 ? (
+        <EmptyState message="No breach records found." />
+      ) : (
+        <div className="space-y-3">
+          <StatTiles
+            tiles={[
+              { icon: Database, label: "Breach rows", value: total },
+              { icon: KeyRound, label: "Passwords", value: passwords },
+              { icon: ShieldAlert, label: "Sources", value: sources },
+            ]}
+          />
+          {passwords > 0 ? (
+            <button type="button" onClick={() => setReveal((r) => !r)} className="btn-secondary btn-compact">
+              {reveal ? "Hide passwords" : "Reveal passwords"}
+            </button>
+          ) : null}
+          <div className="space-y-2.5">
+            {breaches.slice(0, 100).map((b, i) => {
+              const fields: LeakField[] = []
+              if (b.username) fields.push({ label: "User", value: b.username })
+              if (b.email) fields.push({ label: "Email", value: b.email })
+              if (b.ip) fields.push({ label: "IP", value: b.ip })
+              if (b.password) {
+                fields.push({
+                  label: "Password",
+                  value: reveal ? b.password : "•".repeat(Math.min(b.password.length, 12)),
+                  sensitive: true,
+                })
+              }
+              return <RecordCard key={i} record={{ source: b.source || "Unknown source", fields }} />
+            })}
+          </div>
+        </div>
+      )}
+    </Section>
   )
 }
 

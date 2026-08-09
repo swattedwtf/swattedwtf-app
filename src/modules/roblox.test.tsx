@@ -167,13 +167,15 @@ describe("Roblox profile result", () => {
     expect(html).not.toContain("Open profile")
   })
 
-  it("renders every section without throwing on a resolved-but-empty user", () => {
+  it("renders a resolved-but-empty user without throwing, hiding empty sections", () => {
+    // Hide-empty: badges, favorite games and username history are omitted when
+    // empty rather than shown as empty-state cards. Groups keeps its own state.
     const emptyFound = { ...sparse, found: true, profile: { ...sparse.profile, username: "x" } }
     const html = render(emptyFound)
     expect(html).toContain("No groups found.")
-    expect(html).toContain("No badges found.")
-    expect(html).toContain("No favorite games found.")
-    expect(html).toContain("No previous usernames recorded.")
+    expect(html).not.toContain("No badges found.")
+    expect(html).not.toContain("No favorite games found.")
+    expect(html).not.toContain("No previous usernames recorded.")
   })
 
   it("shows a locked section, not empty states, when the plan gates the stealer block", () => {
@@ -190,15 +192,17 @@ describe("Roblox profile result", () => {
     expect(html).not.toContain("No breach records found.")
   })
 
-  it("shows empty states, not a lock, when Heist is present and there is nothing", () => {
+  it("hides the stealer sub-sections, and shows no lock, when Heist is present and there is nothing", () => {
+    // Hide-empty: with Heist present and the provider answered empty, the three
+    // stealer sub-sections are omitted rather than shown as empty-state cards.
     const html = render({
       ...full,
       stealer: { stealerEntries: [], victims: [], breaches: [] },
       stealerLocked: false,
     })
-    expect(html).toContain("No compromised accounts found.")
-    expect(html).toContain("No compromised devices found.")
-    expect(html).toContain("No breach records found.")
+    expect(html).not.toContain("No compromised accounts found.")
+    expect(html).not.toContain("No compromised devices found.")
+    expect(html).not.toContain("No breach records found.")
     expect(html).not.toContain("Heist")
   })
 

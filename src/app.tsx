@@ -11,6 +11,8 @@ import { LoginScreen } from "./auth/LoginScreen"
 import { RegisterScreen } from "./auth/RegisterScreen"
 import { TwoFactorScreen } from "./auth/TwoFactorScreen"
 import { Home } from "./dashboard/Home"
+import { AddressInsightsScreen } from "./modules/AddressInsightsScreen"
+import { TelegramMessagesScreen } from "./modules/TelegramMessagesScreen"
 import { ModuleScreen } from "./modules/ModuleScreen"
 import { StreamScreen } from "./modules/StreamScreen"
 import { SearchScreen } from "./modules/streams/SearchScreen"
@@ -20,7 +22,7 @@ import { Plans } from "./modules/plans"
 import { FaceScreen } from "./modules/face"
 import { Investigations } from "./investigations/Investigations"
 import { MonitorScreen } from "./modules/monitor"
-import { ServerIntel } from "./server-intel/ServerIntel"
+import { ServerIntelRedirect } from "./server-intel/ServerIntelRedirect"
 import { moduleForRoute } from "./modules/registry"
 import { streamModuleForRoute } from "./modules/stream-registry"
 import { Settings } from "./settings/Settings"
@@ -292,12 +294,18 @@ export default function App() {
           {/* Ctrl/Cmd-K launcher, available over every screen. */}
           <CommandPalette onNavigate={setRoute} />
           <Shell route={route} onNavigate={setRoute}>
-            {module ? (
+            {module && route !== "/tools/address-insights" ? (
               <ModuleScreen
                 descriptor={module}
                 initialQuery={activePrefill?.query}
                 onPrefillConsumed={clearPrefill}
               />
+            ) : route === "/tools/address-insights" ? (
+              // Address Insights owns a bespoke full-screen map surface (the web's
+              // interactive Mapbox canvas + typeahead + right panel), not the
+              // generic form. Backed by the same `addressInsights` module for
+              // metering/gating; the screen calls it directly via ipc.lookup.
+              <AddressInsightsScreen />
             ) : route === "/search" ? (
               // Search owns a bespoke hero screen (matching the web's centred
               // composer + Browse Modules card) rather than the generic stream
@@ -333,12 +341,17 @@ export default function App() {
               // nothing metered. It owns two views (the case list and one open
               // case) behind this single route, since the app has no router.
               <Investigations />
+            ) : route === "/telegram/messages" ? (
+              // The indexed-message archive search: modes + paging, not a
+              // one-shot lookup, so it owns a screen and calls the
+              // telegram-messages module directly. Heist-gated server-side.
+              <TelegramMessagesScreen />
             ) : route === "/roblox/server-intel" ? (
               // Not a module either, and the least module-like screen here: a
               // pairing session with an in-game connector rather than a query
               // and an answer. It polls its own unmetered endpoint, which is
               // Heist-gated on minting exactly as the web's pair route is.
-              <ServerIntel />
+              <ServerIntelRedirect />
             ) : route === "/face" ? (
               // A metered lookup like any other, and the only credit-billed one,
               // but its input is an image rather than a string, so it brings its

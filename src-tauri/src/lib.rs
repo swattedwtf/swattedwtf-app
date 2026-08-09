@@ -10,6 +10,7 @@ pub mod commands;
 pub mod config;
 pub mod error;
 pub mod integrity;
+pub mod account;
 pub mod monitor;
 pub mod investigations;
 pub mod picker;
@@ -129,6 +130,7 @@ pub fn run() {
             commands::fetch_image,
             commands::pick_image,
             commands::monitor,
+            commands::account,
             commands::server_intel,
             commands::get_settings,
             commands::set_shortcut,

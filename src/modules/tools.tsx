@@ -414,6 +414,25 @@ export const samsungDescriptor: ModuleDescriptor = {
   // with the server, which is the authority in any case.
   inputs: [
     {
+      name: "mode",
+      label: "Mode",
+      placeholder: "direct",
+      // A toggle, like the web, rather than a box you type the word into, and
+      // kept FIRST so it sits at the top of the form exactly as the web does.
+      // Direct is the server's own default; enumerate sweeps birth dates.
+      options: [
+        { value: "direct", label: "Direct" },
+        { value: "enumerate", label: "Birth date sweep" },
+      ],
+      defaultValue: "direct",
+      optional: true,
+      validate: (v) => {
+        const s = v.trim()
+        if (s.length === 0) return null
+        return s === "direct" || s === "enumerate" ? null : 'Enter "direct" or "enumerate".'
+      },
+    },
+    {
       name: "first_name",
       label: "First name",
       placeholder: "e.g. John",
@@ -437,24 +456,6 @@ export const samsungDescriptor: ModuleDescriptor = {
       placeholder: "e.g. us",
       validate: (v) =>
         COUNTRY_RE.test(v.trim()) ? null : "Enter a two letter country code, for example us.",
-    },
-    {
-      name: "mode",
-      label: "Mode",
-      placeholder: "direct",
-      // A toggle, like the web, rather than a box you type the word into.
-      // Direct is the server's own default; enumerate sweeps birth dates.
-      options: [
-        { value: "direct", label: "Direct" },
-        { value: "enumerate", label: "Birth date sweep" },
-      ],
-      defaultValue: "direct",
-      optional: true,
-      validate: (v) => {
-        const s = v.trim()
-        if (s.length === 0) return null
-        return s === "direct" || s === "enumerate" ? null : 'Enter "direct" or "enumerate".'
-      },
     },
     {
       name: "birth_date",

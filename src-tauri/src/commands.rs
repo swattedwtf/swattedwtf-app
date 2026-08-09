@@ -168,6 +168,18 @@ pub async fn pick_image(app: AppHandle) -> Result<Option<crate::picker::PickedIm
 ///
 /// `action` is a key into a fixed set on the SERVER, never a URL or a path
 /// fragment, so there is no caller-supplied destination in this call either.
+/// Runs one account-management action: regenerate the login code, change the
+/// email, sign out everywhere, or delete the account. A fixed `action` key into
+/// the server's set, never a caller-supplied destination, exactly like `monitor`.
+#[tauri::command]
+pub async fn account(
+    state: State<'_, AppState>,
+    action: String,
+    input: serde_json::Value,
+) -> Result<serde_json::Value, AppError> {
+    crate::account::call(&state.client, &action, input).await
+}
+
 #[tauri::command]
 pub async fn monitor(
     state: State<'_, AppState>,

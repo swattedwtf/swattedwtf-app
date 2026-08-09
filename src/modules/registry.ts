@@ -109,6 +109,7 @@ export const BUILT_IN_ROUTES = [
   "/investigations",
   "/face",
   "/roblox/server-intel",
+  "/telegram/messages",
   "/plans",
 ]
 

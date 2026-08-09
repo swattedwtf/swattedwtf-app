@@ -363,8 +363,17 @@ textarea {
 
 .btn-primary {
   padding: 0 20px;
-  background: linear-gradient(180deg, #fff, #e8e8e8);
-  color: #0b0b0b;
+  /* Accent-driven, so the theme's accent colour actually shows. The default
+     "swatted" accent is white, so this stays the familiar white gradient; a
+     coloured accent recolours the primary buttons. Flat fallback first, then a
+     subtle gradient for webviews that support color-mix. */
+  background: var(--color-primary);
+  background: linear-gradient(
+    180deg,
+    var(--color-primary),
+    color-mix(in srgb, var(--color-primary) 88%, #000)
+  );
+  color: var(--color-primary-foreground);
   box-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
     inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),

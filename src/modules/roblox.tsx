@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Boxes, Layers } from "lucide-react"
 import { ipc } from "../lib/ipc"
 import { RemoteImage } from "./RemoteImage"
@@ -168,6 +169,60 @@ function breachLine(row: StealerBreach): string {
     .join("  ")
 }
 
+type RobloxGroup = {
+  id: string
+  name: string
+  role: string
+  members: number
+  rank: number
+  iconUrl: string | null
+}
+
+/** Groups, capped to 5 at a time with a Load more button, matching the web. A
+ *  scraped account can sit in hundreds of groups; showing them all at once
+ *  buries the rest of the profile. */
+function GroupsSection({ groups }: { groups: RobloxGroup[] }) {
+  const PAGE = 5
+  const [shown, setShown] = useState(PAGE)
+  const visible = groups.slice(0, shown)
+  const remaining = groups.length - visible.length
+
+  return (
+    <Section title={`Groups${groups.length ? ` (${groups.length})` : ""}`}>
+      {groups.length === 0 ? (
+        <EmptyState message="No groups found." />
+      ) : (
+        <>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {visible.map((g, i) => (
+              <li key={g.id || i} className="flex items-center gap-2.5">
+                <RemoteImage url={g.iconUrl} alt={g.name} className="h-8 w-8 shrink-0 rounded-lg text-[11px]" />
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] text-white/85">{g.name || "Unnamed group"}</span>
+                  <span className="block truncate text-[11px] text-[var(--color-muted-foreground)]">
+                    {[g.role, g.members > 0 ? `${g.members.toLocaleString()} members` : ""]
+                      .filter(Boolean)
+                      .join("  ") || "No role recorded"}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {remaining > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + PAGE)}
+              className="btn-secondary btn-compact mt-3"
+            >
+              Load more ({remaining})
+            </button>
+          ) : null}
+        </>
+      )}
+    </Section>
+  )
+}
+
 export function Result({ data, partial }: ResultProps) {
   const raw = withDefaults(data, {} as Partial<RobloxData>)
   const p = withDefaults(raw.profile, EMPTY_ROBLOX_PROFILE)
@@ -286,51 +341,21 @@ export function Result({ data, partial }: ResultProps) {
         </Section>
       )}
 
-      <Section title={`Groups${d.groups.length ? ` (${d.groups.length})` : ""}`}>
-        {d.groups.length === 0 ? (
-          <EmptyState message="No groups found." />
-        ) : (
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {d.groups.map((g, i) => (
-              <li key={g.id || i} className="flex items-center gap-2.5">
-                <RemoteImage
-                  url={g.iconUrl}
-                  alt={g.name}
-                  className="h-8 w-8 shrink-0 rounded-lg text-[11px]"
-                />
-                <span className="min-w-0">
-                  <span className="block truncate text-[13px] text-white/85">
-                    {g.name || "Unnamed group"}
-                  </span>
-                  <span className="block truncate text-[11px] text-[var(--color-muted-foreground)]">
-                    {[g.role, g.members > 0 ? `${g.members.toLocaleString()} members` : ""]
-                      .filter(Boolean)
-                      .join("  ") || "No role recorded"}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+      <GroupsSection groups={d.groups} />
 
-      <Section title={`Badges${d.badges.length ? ` (${d.badges.length})` : ""}`}>
-        {d.badges.length === 0 ? (
-          <EmptyState message="No badges found." />
-        ) : (
+      {d.badges.length > 0 && (
+        <Section title={`Badges (${d.badges.length})`}>
           <BadgeRow
             badges={d.badges.map((b) => ({
               label: b.name || "Badge",
               title: b.description || (b.rare ? "Rare badge" : b.name),
             }))}
           />
-        )}
-      </Section>
+        </Section>
+      )}
 
-      <Section title={`Favorite games${d.favorites.length ? ` (${d.favorites.length})` : ""}`}>
-        {d.favorites.length === 0 ? (
-          <EmptyState message="No favorite games found." />
-        ) : (
+      {d.favorites.length > 0 && (
+        <Section title={`Favorite games (${d.favorites.length})`}>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {d.favorites.map((f, i) => (
               <li key={f.id || i} className="flex items-center gap-2.5">
@@ -352,13 +377,11 @@ export function Result({ data, partial }: ResultProps) {
               </li>
             ))}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
-      <Section title="Username history">
-        {d.usernameHistory.length === 0 ? (
-          <EmptyState message="No previous usernames recorded." />
-        ) : (
+      {d.usernameHistory.length > 0 && (
+        <Section title="Username history">
           <FieldGrid
             fields={d.usernameHistory.map((h, i) => ({
               label: h.changedAt || `Change ${i + 1}`,
@@ -366,8 +389,8 @@ export function Result({ data, partial }: ResultProps) {
               mono: true,
             }))}
           />
-        )}
-      </Section>
+        </Section>
+      )}
 
       {/* The whole stealer block is Heist-gated. When it is locked the server
           returns it empty with a 200, so a single LockedSection stands in for
@@ -381,14 +404,8 @@ export function Result({ data, partial }: ResultProps) {
         </Section>
       ) : (
         <>
-          <Section
-            title={`Compromised accounts${
-              stealer.stealerEntries.length ? ` (${stealer.stealerEntries.length})` : ""
-            }`}
-          >
-            {stealer.stealerEntries.length === 0 ? (
-              <EmptyState message="No compromised accounts found." />
-            ) : (
+          {stealer.stealerEntries.length > 0 && (
+            <Section title={`Compromised accounts (${stealer.stealerEntries.length})`}>
               <ul className="space-y-2 text-[12px]">
                 {stealer.stealerEntries.slice(0, 50).map((e, i) => (
                   <li key={e.id || i} className="min-w-0">
@@ -418,15 +435,11 @@ export function Result({ data, partial }: ResultProps) {
                   </li>
                 ))}
               </ul>
-            )}
-          </Section>
+            </Section>
+          )}
 
-          <Section
-            title={`Device victims${stealer.victims.length ? ` (${stealer.victims.length})` : ""}`}
-          >
-            {stealer.victims.length === 0 ? (
-              <EmptyState message="No compromised devices found." />
-            ) : (
+          {stealer.victims.length > 0 && (
+            <Section title={`Device victims (${stealer.victims.length})`}>
               <FieldGrid
                 fields={stealer.victims.slice(0, 25).map((v, i) => ({
                   label: v.pwned_at || v.indexed_at || `Device ${i + 1}`,
@@ -441,15 +454,11 @@ export function Result({ data, partial }: ResultProps) {
                   mono: true,
                 }))}
               />
-            )}
-          </Section>
+            </Section>
+          )}
 
-          <Section
-            title={`Breach records${stealer.breaches.length ? ` (${stealer.breaches.length})` : ""}`}
-          >
-            {stealer.breaches.length === 0 ? (
-              <EmptyState message="No breach records found." />
-            ) : (
+          {stealer.breaches.length > 0 && (
+            <Section title={`Breach records (${stealer.breaches.length})`}>
               <ul className="space-y-1 font-mono text-[11px] leading-relaxed text-white/70">
                 {stealer.breaches.slice(0, 50).map((b, i) => (
                   <li key={b.id || i} className="truncate">
@@ -457,8 +466,9 @@ export function Result({ data, partial }: ResultProps) {
                   </li>
                 ))}
               </ul>
-            )}
-          </Section>
+            </Section>
+          )}
+
         </>
       )}
     </div>
@@ -701,26 +711,39 @@ export const scraperDescriptor: ModuleDescriptor = {
     },
     {
       name: "showDeleted",
-      label: 'Include deleted accounts ("true" or "false", optional)',
+      label: "Include deleted accounts",
       placeholder: "false",
       optional: true,
+      // Real toggle buttons, matching the web, instead of typing "true"/"false".
+      options: [
+        { value: "false", label: "No" },
+        { value: "true", label: "Yes" },
+      ],
+      defaultValue: "false",
       validate: (v) => {
         const s = v.trim()
-        // Blank means the server's own default, which is false.
+        // Blank is legitimate: the field is optional and default-seeded, and the
+        // server reads a missing value as its own default (false).
         if (s.length === 0) return null
-        return s === "true" || s === "false" ? null : 'Enter "true" or "false".'
+        return s === "true" || s === "false" ? null : 'Choose "Yes" or "No".'
       },
     },
     {
       name: "showStatus",
-      label: 'Fetch presence status ("true" or "false", optional)',
+      label: "Fetch presence status",
       placeholder: "false",
       optional: true,
+      options: [
+        { value: "false", label: "No" },
+        { value: "true", label: "Yes" },
+      ],
+      defaultValue: "false",
       validate: (v) => {
         const s = v.trim()
-        // Blank means the server's own default, which is false.
+        // Blank is legitimate: the field is optional and default-seeded, and the
+        // server reads a missing value as its own default (false).
         if (s.length === 0) return null
-        return s === "true" || s === "false" ? null : 'Enter "true" or "false".'
+        return s === "true" || s === "false" ? null : 'Choose "Yes" or "No".'
       },
     },
   ],

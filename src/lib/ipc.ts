@@ -267,6 +267,11 @@ export const ipc = {
   monitor: (action: string, input: Record<string, unknown> = {}) =>
     invoke<Record<string, unknown>>("monitor", { action, input }),
 
+  /** Account-management actions on the Settings screen (regenerate login code,
+   *  change email, sign out everywhere, delete account). */
+  account: (action: string, input: Record<string, unknown> = {}) =>
+    invoke<Record<string, unknown>>("account", { action, input }),
+
   /**
    * Runs one Roblox Server Intel action: `pair`, `unpair`, `state`, `overlay`,
    * `highlight` or `player`.

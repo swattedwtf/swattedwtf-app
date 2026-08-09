@@ -56,6 +56,7 @@ type IntelCard = {
   title?: unknown
   subtitle?: unknown
   avatar?: unknown
+  logo?: unknown
   viewUrl?: unknown
   fields?: unknown
   existenceOnly?: unknown
@@ -116,7 +117,7 @@ function CardView({ card }: { card: IntelCard }) {
 
   return (
     <ProfileCard
-      avatarUrl={text(card.avatar) || null}
+      avatarUrl={text(card.avatar) || text(card.logo) || null}
       name={title}
       subtitle={text(card.subtitle) || provider}
       meta={meta}

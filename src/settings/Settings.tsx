@@ -4,8 +4,15 @@ import {
   Check,
   ExternalLink,
   Keyboard,
+  KeyRound,
+  Loader2,
+  LogOut,
+  Mail,
   Power,
+  RefreshCw,
+  Send,
   ShieldCheck,
+  Trash2,
   User,
   Wallet,
 } from "lucide-react"
@@ -149,22 +156,9 @@ export function AccountSection({
     >
       <Row label="Handle" value={overview.user.handle} />
       <Row label="User number" value={`#${overview.user.userNumber}`} />
-      <Row label="Email" value={overview.user.email ?? "Not set"} />
       <Row label="Member since" value={formatSince(overview.plan.since)} />
-      <Row
-        label="Telegram"
-        value={overview.telegram.username ? `@${overview.telegram.username}` : "Not linked"}
-      />
 
       <div className="flex flex-wrap gap-2 pt-1">
-        <button
-          type="button"
-          onClick={() => void openWeb(WEB_SETTINGS_URL)}
-          className="btn-secondary btn-compact"
-        >
-          {overview.telegram.linked ? "Manage on the web" : "Link Telegram"}
-          <ExternalLink className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
-        </button>
         <button
           type="button"
           onClick={onLogout}
@@ -172,8 +166,222 @@ export function AccountSection({
           className="btn-secondary btn-compact"
           style={{ color: "var(--color-destructive)" }}
         >
+          <LogOut className="h-3.5 w-3.5" aria-hidden />
           Log out
         </button>
+      </div>
+    </Panel>
+  )
+}
+
+/* ---- Sign-in (login code) --------------------------------------------- */
+
+export function SignInSection() {
+  const [code, setCode] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function regenerate() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = (await ipc.account("regenerateLoginCode")) as { ok?: boolean; code?: string; error?: string }
+      if (res.ok && typeof res.code === "string") setCode(res.code)
+      else setError(res.error || "Could not regenerate your login code.")
+    } catch (e) {
+      setError(messageOf(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Panel
+      title="Sign-in"
+      description="Your login code is how you sign in. Regenerating it signs out other sessions."
+      icon={<KeyRound className="h-4 w-4" aria-hidden="true" />}
+    >
+      {code ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 py-2.5">
+          <span className="truncate font-mono text-[13px] tracking-[0.2em] text-white">{code}</span>
+          <button
+            type="button"
+            onClick={() => {
+              void copyText(code).then((ok) => {
+                if (!ok) return
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1500)
+              })
+            }}
+            className="btn-secondary btn-compact shrink-0"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : "Copy"}
+          </button>
+        </div>
+      ) : (
+        <Help>Regenerate your 12-digit login code. Keep it secret; it is the key to your account.</Help>
+      )}
+      {error && <Note>{error}</Note>}
+      <div className="pt-1">
+        <button type="button" onClick={() => void regenerate()} disabled={busy} className="btn-secondary btn-compact">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+          Regenerate login code
+        </button>
+      </div>
+    </Panel>
+  )
+}
+
+/* ---- Email ------------------------------------------------------------ */
+
+export function EmailSection({ overview }: { overview: Overview }) {
+  const [email, setEmail] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (busy || !email.trim()) return
+    setBusy(true)
+    setError(null)
+    setDone(false)
+    try {
+      const res = (await ipc.account("updateEmail", { email: email.trim() })) as { ok?: boolean; error?: string }
+      if (res.ok) {
+        setDone(true)
+        setEmail("")
+      } else setError(res.error || "Could not update your email.")
+    } catch (err) {
+      setError(messageOf(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Panel
+      title="Email"
+      description="Used for sign-in and security notifications."
+      icon={<Mail className="h-4 w-4" aria-hidden="true" />}
+    >
+      <Row label="Current" value={overview.user.email ?? "Not set"} />
+      <form onSubmit={submit} className="space-y-2 pt-1">
+        <input
+          type="email"
+          value={email}
+          onChange={(ev) => setEmail(ev.target.value)}
+          placeholder="you@example.com"
+          className="h-10 w-full rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 text-[13px] text-white placeholder:text-[var(--color-muted-foreground)] focus:outline-none"
+        />
+        {error && <Note>{error}</Note>}
+        {done && <Help>Email updated.</Help>}
+        <button type="submit" disabled={busy || !email.trim()} className="btn-secondary btn-compact">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+          Update email
+        </button>
+      </form>
+    </Panel>
+  )
+}
+
+/* ---- Danger zone ------------------------------------------------------- */
+
+export function DangerZoneSection({ onLoggedOut }: { onLoggedOut: () => void }) {
+  const [signOutBusy, setSignOutBusy] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function signOutEverywhere() {
+    if (signOutBusy) return
+    setSignOutBusy(true)
+    setError(null)
+    try {
+      const res = (await ipc.account("signOutEverywhere")) as { ok?: boolean; error?: string }
+      if (res.ok) {
+        await ipc.logout().catch(() => {})
+        onLoggedOut()
+      } else setError(res.error || "Could not sign out everywhere.")
+    } catch (e) {
+      setError(messageOf(e))
+    } finally {
+      setSignOutBusy(false)
+    }
+  }
+
+  async function deleteAccount() {
+    if (deleteBusy) return
+    setDeleteBusy(true)
+    setError(null)
+    try {
+      const res = (await ipc.account("deleteAccount")) as { ok?: boolean; error?: string }
+      if (res.ok) {
+        await ipc.logout().catch(() => {})
+        onLoggedOut()
+      } else setError(res.error || "Could not delete your account.")
+    } catch (e) {
+      setError(messageOf(e))
+    } finally {
+      setDeleteBusy(false)
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <Panel
+      title="Danger zone"
+      description="Irreversible actions. Be sure before continuing."
+      icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+    >
+      <Row label="Sign out everywhere" hint="Revokes every active session across all devices, including this one." value={null} />
+      <div>
+        <button
+          type="button"
+          onClick={() => void signOutEverywhere()}
+          disabled={signOutBusy || deleteBusy}
+          className="btn-secondary btn-compact"
+        >
+          {signOutBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <LogOut className="h-3.5 w-3.5" aria-hidden />}
+          Sign out everywhere
+        </button>
+      </div>
+
+      <div className="pt-2">
+        <Row label="Delete account" hint="Permanently removes your account, profile, and usage history. This cannot be undone." value={null} />
+        {error && <Note>{error}</Note>}
+        {confirming ? (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-xs text-[var(--color-destructive)]">This cannot be undone. Delete anyway?</span>
+            <button
+              type="button"
+              onClick={() => void deleteAccount()}
+              disabled={deleteBusy}
+              className="btn-secondary btn-compact"
+              style={{ color: "var(--color-destructive)" }}
+            >
+              {deleteBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Trash2 className="h-3.5 w-3.5" aria-hidden />}
+              Yes, delete my account
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} disabled={deleteBusy} className="btn-secondary btn-compact">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="btn-secondary btn-compact"
+              style={{ color: "var(--color-destructive)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              Delete account
+            </button>
+          </div>
+        )}
       </div>
     </Panel>
   )
@@ -480,28 +688,49 @@ export function SecuritySection({ overview }: { overview: Overview }) {
   return (
     <Panel
       title="Security"
-      description="Two-factor authentication for this account."
+      description="Two-factor authentication and account recovery."
       icon={<ShieldCheck className="h-4 w-4" aria-hidden="true" />}
     >
       <Row
         label="Two-factor authentication"
+        hint="Require a 6-digit authenticator code when you sign in."
         value={overview.security.twofaEnabled ? "Enabled" : "Disabled"}
       />
-      <Help>
-        Your session is stored in the operating system credential store and is never exposed to the
-        app's interface code. On Linux systems without a Secret Service provider it falls back to a
-        permission-restricted file in the app data directory, which is weaker at rest.
-      </Help>
-      <div className="pt-1">
+      <div>
         <button
           type="button"
           onClick={() => void openWeb(WEB_SETTINGS_URL)}
           className="btn-secondary btn-compact"
         >
-          Manage two-factor on the web
+          {overview.security.twofaEnabled ? "Manage two-factor" : "Start setup"}
           <ExternalLink className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
         </button>
       </div>
+
+      <div className="pt-2">
+        <Row
+          label="Telegram recovery"
+          hint="Link your Telegram for account recovery and bot access."
+          value={overview.telegram.linked ? (overview.telegram.username ? `@${overview.telegram.username}` : "Linked") : "Not linked"}
+        />
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => void openWeb(WEB_SETTINGS_URL)}
+            className="btn-secondary btn-compact"
+          >
+            <Send className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+            {overview.telegram.linked ? "Manage Telegram" : "Generate a code"}
+            <ExternalLink className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <Help>
+        Two-factor setup and Telegram linking run on the web dashboard, where the QR code and the
+        recovery bot handshake live. Your session is stored in the operating system credential store
+        and is never exposed to the app's interface code.
+      </Help>
     </Panel>
   )
 }
@@ -824,9 +1053,12 @@ export function Settings({
       <div className="mt-6 space-y-5">
         {tab === "account" && (
           <>
+            <SignInSection />
+            <EmailSection overview={overview} />
+            <SecuritySection overview={overview} />
             <AccountSection overview={overview} busy={busy} onLogout={logout} />
             <PlanSection overview={overview} />
-            <SecuritySection overview={overview} />
+            <DangerZoneSection onLoggedOut={onLoggedOut} />
           </>
         )}
 

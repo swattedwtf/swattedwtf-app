@@ -31,6 +31,8 @@ import { EmptyState, FieldGrid, ProfileCard, Section } from "./ui"
 
 const QUERY_MAX = 256
 
+type MachineFile = { id: string; name: string; danger: boolean }
+
 type DumpData = {
   filename: string
   hash: string
@@ -42,7 +44,10 @@ type DumpData = {
   emails: string[]
   totalCreds: number
   emailCount: number
-  files: { name: string; danger: boolean }[]
+  files: MachineFile[]
+  // Identify + authorise this log so a file's contents can be fetched.
+  logId: string | null
+  machineGrant: string | null
 }
 
 type Victim = {
@@ -96,7 +101,13 @@ function coerceDump(raw: unknown): DumpData | null {
     emails: list<string>(d.emails),
     totalCreds: typeof d.totalCreds === "number" ? d.totalCreds : 0,
     emailCount: typeof d.emailCount === "number" ? d.emailCount : 0,
-    files: list<{ name: string; danger: boolean }>(d.files),
+    files: list<Partial<MachineFile>>(d.files).map((f) => ({
+      id: typeof f?.id === "string" ? f.id : "",
+      name: typeof f?.name === "string" ? f.name : "",
+      danger: f?.danger === true,
+    })),
+    logId: typeof d.logId === "string" ? d.logId : null,
+    machineGrant: typeof d.machineGrant === "string" ? d.machineGrant : null,
   }
 }
 
@@ -151,23 +162,123 @@ function StringList({
   )
 }
 
-/** The captured file tree, flattened by the server into labelled paths.
- *  Credential-bearing files are tinted so they stand out in a long list. */
-function FileList({ files }: { files: { name: string; danger: boolean }[] }) {
+/**
+ * The captured files, flattened by the server into labelled paths. Each file is
+ * openable: clicking it fetches its contents through the `machineFile` module
+ * (the desktop equivalent of the web's lazy file fetch) and shows them in a
+ * viewer. Credential-bearing files are tinted so they stand out in a long list.
+ */
+function FileBrowser({
+  files,
+  logId,
+  machineGrant,
+  searchId,
+}: {
+  files: MachineFile[]
+  logId: string | null
+  machineGrant: string | null
+  searchId: string | null
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [openName, setOpenName] = useState("")
+  const [content, setContent] = useState<string | null>(null)
+  const [truncated, setTruncated] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Files can only be opened when the server told us which log this dump is and
+  // gave the file an id. Without a logId there is nothing to authorise against.
+  const canOpen = Boolean(logId)
+
+  async function open(file: MachineFile) {
+    if (!logId || !file.id || loading) return
+    setOpenId(file.id)
+    setOpenName(file.name)
+    setContent(null)
+    setTruncated(false)
+    setError(null)
+    setLoading(true)
+    try {
+      const input: Record<string, unknown> = { logId, fileId: file.id }
+      if (searchId) input.searchId = searchId
+      if (machineGrant) input.machineGrant = machineGrant
+      const result = await ipc.lookup("machineFile", input)
+      const d = withDefaults(result.data, {} as { content?: unknown; truncated?: unknown; error?: unknown })
+      if (typeof d.content === "string") {
+        setContent(d.content)
+        setTruncated(d.truncated === true)
+      } else {
+        setError(
+          d.error === "not-found"
+            ? "This file was not found in the log."
+            : d.error === "not-authorized"
+              ? "This machine log is not authorised for your session. Run the search again."
+              : "That file could not be loaded.",
+        )
+      }
+    } catch {
+      setError("That file could not be loaded.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (openId) {
+    return (
+      <Section
+        title={openName || "File"}
+        action={
+          <button type="button" className="btn-secondary btn-compact" onClick={() => setOpenId(null)}>
+            Back to files
+          </button>
+        }
+      >
+        {loading ? (
+          <p className="font-mono text-[11px] text-[var(--color-muted-foreground)]">Loading file…</p>
+        ) : error ? (
+          <p role="alert" className="text-xs text-[var(--color-destructive)]">
+            {error}
+          </p>
+        ) : (
+          <>
+            {truncated ? (
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                Truncated preview
+              </p>
+            ) : null}
+            <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/80">
+              {content || "(empty file)"}
+            </pre>
+          </>
+        )}
+      </Section>
+    )
+  }
+
   return (
     <Section title={`Files${files.length ? ` (${files.length})` : ""}`}>
       {files.length === 0 ? (
         <EmptyState message="No files listed in this dump." />
       ) : (
         <ul className="space-y-1 font-mono text-[11px] leading-relaxed">
-          {files.slice(0, 200).map((f, i) => (
-            <li
-              key={i}
-              className={`truncate ${f.danger ? "text-[var(--color-destructive)]" : "text-white/70"}`}
-            >
-              {f.name || "Unnamed file"}
-            </li>
-          ))}
+          {files.slice(0, 200).map((f, i) => {
+            const tint = f.danger ? "text-[var(--color-destructive)]" : "text-white/70"
+            return (
+              <li key={i}>
+                {canOpen && f.id ? (
+                  <button
+                    type="button"
+                    onClick={() => void open(f)}
+                    className={`block w-full truncate text-left transition-colors hover:text-white ${tint}`}
+                  >
+                    {f.name || "Unnamed file"}
+                  </button>
+                ) : (
+                  <span className={`block truncate ${tint}`}>{f.name || "Unnamed file"}</span>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </Section>
@@ -175,7 +286,7 @@ function FileList({ files }: { files: { name: string; danger: boolean }[] }) {
 }
 
 /** One loaded machine dump: identity, counts, recovered selectors, file tree. */
-function DumpView({ dump }: { dump: DumpData }) {
+function DumpView({ dump, searchId }: { dump: DumpData; searchId: string | null }) {
   return (
     <div className="space-y-4">
       <ProfileCard
@@ -211,7 +322,12 @@ function DumpView({ dump }: { dump: DumpData }) {
         empty="No Discord ids in this dump."
       />
 
-      <FileList files={dump.files} />
+      <FileBrowser
+        files={dump.files}
+        logId={dump.logId}
+        machineGrant={dump.machineGrant}
+        searchId={searchId}
+      />
     </div>
   )
 }
@@ -312,7 +428,7 @@ export function Result({ data }: ResultProps) {
   }
 
   // A single hit arrives already hydrated; land straight on it.
-  if (eagerDump) return <DumpView dump={eagerDump} />
+  if (eagerDump) return <DumpView dump={eagerDump} searchId={searchId} />
 
   // A pick has loaded: show the dump, with a way back to the list.
   if (picked) {
@@ -327,7 +443,7 @@ export function Result({ data }: ResultProps) {
             Back to results
           </button>
         ) : null}
-        <DumpView dump={picked} />
+        <DumpView dump={picked} searchId={searchId} />
       </div>
     )
   }
