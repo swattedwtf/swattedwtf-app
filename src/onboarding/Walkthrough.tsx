@@ -4,11 +4,15 @@ import {
   ArrowRight,
   Check,
   Download,
+  HardDrive,
   KeyRound,
   Keyboard,
-  LayoutGrid,
+  Radar,
+  ScanFace,
   Search,
   ShieldCheck,
+  Sparkles,
+  Wrench,
   type LucideIcon,
 } from "lucide-react"
 
@@ -67,15 +71,6 @@ function Panel({ children, dim = false }: { children: ReactNode; dim?: boolean }
   )
 }
 
-function Line({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return (
-    <li className="flex items-center gap-2.5 text-[13px] text-white/75">
-      <span className="grid h-4 w-4 shrink-0 place-items-center">{icon}</span>
-      <span className="truncate">{children}</span>
-    </li>
-  )
-}
-
 /* ---- Step content ------------------------------------------------------- */
 
 type Step = {
@@ -85,7 +80,72 @@ type Step = {
   visual: ReactNode
 }
 
+/** The platform lookups, shown as an app-launcher grid on the welcome screen -
+ *  the true value proposition now that the whole platform ships in the app. The
+ *  brand marks are the recognisable, on-brand element the first screen is built
+ *  around. */
+const PLATFORM_TILES: { label: string; brand: string }[] = [
+  { label: "Discord", brand: "/brand/discord.svg" },
+  { label: "Telegram", brand: "/brand/telegram.svg" },
+  { label: "Roblox", brand: "/brand/roblox.svg" },
+  { label: "TikTok", brand: "/brand/tiktok.svg" },
+  { label: "Snapchat", brand: "/brand/snapchat.svg" },
+  { label: "Instagram", brand: "/brand/instagram.svg" },
+  { label: "Minecraft", brand: "/brand/minecraft.svg" },
+]
+
+const TOOL_TILES: { label: string; icon: LucideIcon }[] = [
+  { label: "Search", icon: Search },
+  { label: "Live Intel", icon: Radar },
+  { label: "Machine", icon: HardDrive },
+  { label: "Face", icon: ScanFace },
+  { label: "Tools", icon: Wrench },
+]
+
+function ModuleShowcase() {
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        {PLATFORM_TILES.map((p) => (
+          <div
+            key={p.label}
+            className="glass-tile flex flex-col items-center gap-1.5 px-1 py-3"
+            title={p.label}
+          >
+            <img src={p.brand} alt="" className="h-6 w-6 opacity-95" />
+            <span className="truncate text-[9.5px] text-white/55">{p.label}</span>
+          </div>
+        ))}
+        {TOOL_TILES.map((t) => {
+          const Icon = t.icon
+          return (
+            <div
+              key={t.label}
+              className="glass-tile flex flex-col items-center gap-1.5 px-1 py-3"
+              title={t.label}
+            >
+              <Icon className="h-[22px] w-[22px] text-white/85" aria-hidden="true" />
+              <span className="truncate text-[9.5px] text-white/55">{t.label}</span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-3 text-[11.5px] leading-relaxed text-[var(--color-muted-foreground)]">
+        Plus Address Insights on a live map, Investigations and Monitor - all metered to your plan,
+        the same as the website.
+      </p>
+    </div>
+  )
+}
+
 const STEPS: Step[] = [
+  {
+    icon: Sparkles,
+    title: "The whole platform, on your desktop",
+    body:
+      "Every lookup from swatted.wtf, now a native app. Resolve profiles and breach data across Discord, Telegram, Roblox, TikTok, Snapchat, Instagram and Minecraft; run a unified breach Search; sweep an email or phone with Live Intelligence; open captured machines in the Machine Browser; and reach the full Tools suite - all signed in as you, gated to your plan.",
+    visual: <ModuleShowcase />,
+  },
   {
     // Deliberately not the Command glyph: this is a Windows app and the
     // hotkey has no Command key in it.
@@ -114,43 +174,6 @@ const STEPS: Step[] = [
             enter
           </span>
         </div>
-      </div>
-    ),
-  },
-  {
-    icon: LayoutGrid,
-    title: "What is in this release",
-    body:
-      "The dashboard, settings and the quick lookup bar are finished. Every other entry in the sidebar is drawn but dimmed, with a 'soon' tag, so you can see where the platform is going without wondering what is broken. Those screens arrive in later updates. Until then they all work on the website.",
-    visual: (
-      <div className="grid grid-cols-2 gap-3">
-        <Panel>
-          <Eyebrow>Working now</Eyebrow>
-          <ul className="mt-2.5 space-y-1.5">
-            <Line icon={<Check className="h-3.5 w-3.5 text-[var(--color-positive)]" />}>
-              Dashboard
-            </Line>
-            <Line icon={<Check className="h-3.5 w-3.5 text-[var(--color-positive)]" />}>
-              Settings
-            </Line>
-            <Line icon={<Check className="h-3.5 w-3.5 text-[var(--color-positive)]" />}>
-              Quick lookup
-            </Line>
-          </ul>
-        </Panel>
-
-        <Panel dim>
-          <Eyebrow>Coming later</Eyebrow>
-          <ul className="mt-2.5 space-y-1.5">
-            <Line icon={<span className="h-1 w-1 rounded-full bg-white/40" />}>Search</Line>
-            <Line icon={<span className="h-1 w-1 rounded-full bg-white/40" />}>
-              Platform lookups
-            </Line>
-            <Line icon={<span className="h-1 w-1 rounded-full bg-white/40" />}>
-              Tools and the agent
-            </Line>
-          </ul>
-        </Panel>
       </div>
     ),
   },
@@ -293,7 +316,7 @@ export function Walkthrough({ onDone }: { onDone: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-label="Welcome to swatted.wtf"
-      className="drag fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#0b0b0b]"
+      className="drag fixed inset-0 z-50 flex flex-col overflow-hidden bg-[var(--color-background)]"
     >
       {/* Same three-layer surface as the shell, so the tour reads as part of
           the app rather than a page laid on top of it. */}
